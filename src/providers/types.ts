@@ -159,7 +159,9 @@ export const SleepStageSchema = z.object({
   seconds: z.number(),
 });
 export const SleepLogSchema = z.object({
-  logId: z.number(),
+  // Fitbit issues numeric log ids; Google Health identifies data points by
+  // resource-name strings (`users/me/dataTypes/sleep/dataPoints/{id}`).
+  logId: z.union([z.number(), z.string()]),
   dateOfSleep: z.string(),
   startTime: z.string(),
   endTime: z.string(),

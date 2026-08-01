@@ -17,11 +17,22 @@ type TokenResponseT = z.infer<typeof TokenResponse>;
 
 const REFRESH_SKEW_SEC = 60;
 
-// Google tokens live in the same TOKENS KV namespace as Fitbit's, but under
-// `gh_`-prefixed keys so both providers can coexist during the dual-run window.
-const KV_ACCESS = 'gh_access_token';
-const KV_REFRESH = 'gh_refresh_token';
-const KV_EXPIRES = 'gh_expires_at';
+/**
+ * KV key layout in the TOKENS namespace:
+ * - single-user mode (no userId): `gh_access_token` / `gh_refresh_token` /
+ *   `gh_expires_at` — seeded by scripts/setup-google-health.ts
+ * - multi-user mode: `gh_u_<userId>_*` — seeded by the OAuth callback via
+ *   `persistGoogleTokens`, where userId is the Google `sub` claim
+ * Fitbit's unprefixed keys live alongside; the prefixes never collide.
+ */
+function kvKeys(userId?: string) {
+  const prefix = userId ? `gh_u_${userId}_` : 'gh_';
+  return {
+    access: `${prefix}access_token`,
+    refresh: `${prefix}refresh_token`,
+    expires: `${prefix}expires_at`,
+  };
+}
 
 export type GoogleTokenBundle = {
   accessToken: string;
@@ -29,56 +40,72 @@ export type GoogleTokenBundle = {
   expiresAt: number; // unix seconds
 };
 
-// Per-isolate token memory. A composite tool call fires ~10 parallel API
-// requests through getGoogleAccessToken; without this they would each read
-// 3 KV keys (subrequest budget) and, on expiry, stampede the token endpoint
-// with concurrent KV writes to the same keys (KV allows ~1 write/sec/key).
+// Per-isolate token memory, keyed by user (single-user mode uses ''). A
+// composite tool call fires ~10 parallel API requests through
+// getGoogleAccessToken; without this they would each read 3 KV keys
+// (subrequest budget) and, on expiry, stampede the token endpoint with
+// concurrent KV writes to the same keys (KV allows ~1 write/sec/key).
 // Memory is only ever a copy of what KV holds, so a stale isolate at worst
 // triggers the client's 401 → invalidate → refresh path.
-let memoryToken: { accessToken: string; expiresAt: number } | null = null;
-let refreshInFlight: Promise<GoogleTokenBundle> | null = null;
+const memoryTokens = new Map<string, { accessToken: string; expiresAt: number }>();
+const refreshesInFlight = new Map<string, Promise<GoogleTokenBundle>>();
+
+function memoryKey(userId?: string): string {
+  return userId ?? '';
+}
 
 /** Test-only: clear the per-isolate token memory between test cases. */
 export function resetGoogleTokenMemory(): void {
-  memoryToken = null;
-  refreshInFlight = null;
+  memoryTokens.clear();
+  refreshesInFlight.clear();
 }
 
-async function readStoredTokens(env: Env): Promise<GoogleTokenBundle> {
+async function readStoredTokens(env: Env, userId?: string): Promise<GoogleTokenBundle> {
+  const keys = kvKeys(userId);
   const [accessToken, refreshToken, expiresAtRaw] = await Promise.all([
-    env.TOKENS.get(KV_ACCESS),
-    env.TOKENS.get(KV_REFRESH),
-    env.TOKENS.get(KV_EXPIRES),
+    env.TOKENS.get(keys.access),
+    env.TOKENS.get(keys.refresh),
+    env.TOKENS.get(keys.expires),
   ]);
   if (!accessToken || !refreshToken || !expiresAtRaw) {
     throw new GoogleHealthAuthError(
-      'Google Health tokens not found in TOKENS KV. Run `pnpm run setup:google-health` on a developer machine and populate the namespace.',
+      userId
+        ? `Google Health tokens for user ${userId} not found in TOKENS KV. Reconnect the connector to re-authorize.`
+        : 'Google Health tokens not found in TOKENS KV. Run `pnpm run setup:google-health` on a developer machine and populate the namespace.',
     );
   }
   const expiresAt = Number(expiresAtRaw);
   if (!Number.isFinite(expiresAt)) {
-    throw new GoogleHealthAuthError(`${KV_EXPIRES} in KV is not numeric: ${expiresAtRaw}`);
+    throw new GoogleHealthAuthError(`${keys.expires} in KV is not numeric: ${expiresAtRaw}`);
   }
   return { accessToken, refreshToken, expiresAt };
 }
 
-async function persistTokens(
+/**
+ * Store a user's Google token bundle. Used by the multi-user OAuth callback
+ * after the authorization-code exchange, and internally after refreshes.
+ */
+export async function persistGoogleTokens(
   env: Env,
-  tokens: TokenResponseT,
-  refreshToken: string,
-  issuedAtSec: number,
+  userId: string | undefined,
+  bundle: GoogleTokenBundle,
 ): Promise<void> {
-  const expiresAt = issuedAtSec + tokens.expires_in;
+  const keys = kvKeys(userId);
   await Promise.all([
-    env.TOKENS.put(KV_ACCESS, tokens.access_token),
-    env.TOKENS.put(KV_REFRESH, refreshToken),
-    env.TOKENS.put(KV_EXPIRES, String(expiresAt)),
+    env.TOKENS.put(keys.access, bundle.accessToken),
+    env.TOKENS.put(keys.refresh, bundle.refreshToken),
+    env.TOKENS.put(keys.expires, String(bundle.expiresAt)),
   ]);
+  memoryTokens.set(memoryKey(userId), {
+    accessToken: bundle.accessToken,
+    expiresAt: bundle.expiresAt,
+  });
 }
 
 export async function refreshGoogleTokens(
   env: Env,
   refreshToken: string,
+  userId?: string,
 ): Promise<GoogleTokenBundle> {
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
     throw new GoogleHealthAuthError(
@@ -115,49 +142,53 @@ export async function refreshGoogleTokens(
     );
   }
 
-  const nextRefreshToken = parsed.refresh_token ?? refreshToken;
   const issuedAtSec = Math.floor(Date.now() / 1000);
-  await persistTokens(env, parsed, nextRefreshToken, issuedAtSec);
-
-  const bundle = {
+  const bundle: GoogleTokenBundle = {
     accessToken: parsed.access_token,
-    refreshToken: nextRefreshToken,
+    refreshToken: parsed.refresh_token ?? refreshToken,
     expiresAt: issuedAtSec + parsed.expires_in,
   };
-  memoryToken = { accessToken: bundle.accessToken, expiresAt: bundle.expiresAt };
+  await persistGoogleTokens(env, userId, bundle);
   return bundle;
 }
 
 /**
- * Returns a currently-valid Google access token, refreshing it when within
- * REFRESH_SKEW_SEC of expiry. Safe to call on every API request: repeat
- * calls are served from per-isolate memory, and concurrent refreshes are
- * coalesced into a single token request (single-flight).
+ * Returns a currently-valid Google access token for the given user (or the
+ * single-user bundle when userId is omitted), refreshing it when within
+ * REFRESH_SKEW_SEC of expiry. Repeat calls are served from per-isolate
+ * memory; concurrent refreshes are coalesced per user (single-flight).
  */
-export async function getGoogleAccessToken(env: Env): Promise<string> {
+export async function getGoogleAccessToken(env: Env, userId?: string): Promise<string> {
+  const key = memoryKey(userId);
   const now = Math.floor(Date.now() / 1000);
-  if (memoryToken && memoryToken.expiresAt - REFRESH_SKEW_SEC > now) {
-    return memoryToken.accessToken;
+  const cached = memoryTokens.get(key);
+  if (cached && cached.expiresAt - REFRESH_SKEW_SEC > now) {
+    return cached.accessToken;
   }
 
-  if (!refreshInFlight) {
-    refreshInFlight = (async () => {
-      const current = await readStoredTokens(env);
+  let inFlight = refreshesInFlight.get(key);
+  if (!inFlight) {
+    inFlight = (async () => {
+      const current = await readStoredTokens(env, userId);
       if (current.expiresAt - REFRESH_SKEW_SEC > now) {
-        memoryToken = { accessToken: current.accessToken, expiresAt: current.expiresAt };
+        memoryTokens.set(key, {
+          accessToken: current.accessToken,
+          expiresAt: current.expiresAt,
+        });
         return current;
       }
-      return refreshGoogleTokens(env, current.refreshToken);
+      return refreshGoogleTokens(env, current.refreshToken, userId);
     })().finally(() => {
-      refreshInFlight = null;
+      refreshesInFlight.delete(key);
     });
+    refreshesInFlight.set(key, inFlight);
   }
-  const bundle = await refreshInFlight;
+  const bundle = await inFlight;
   return bundle.accessToken;
 }
 
 /** Force the next `getGoogleAccessToken()` to refresh. Used after an unexpected 401. */
-export async function invalidateGoogleAccessToken(env: Env): Promise<void> {
-  memoryToken = null;
-  await env.TOKENS.put(KV_EXPIRES, '0');
+export async function invalidateGoogleAccessToken(env: Env, userId?: string): Promise<void> {
+  memoryTokens.delete(memoryKey(userId));
+  await env.TOKENS.put(kvKeys(userId).expires, '0');
 }

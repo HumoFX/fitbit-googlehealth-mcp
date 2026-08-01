@@ -17,7 +17,14 @@ export type GoogleHealthRequest = {
 };
 
 export class GoogleHealthClient {
-  constructor(private readonly env: Env) {}
+  /**
+   * @param userId Google `sub` of the granting user in multi-user mode;
+   *   omitted in single-user mode, where the unprefixed KV bundle is used.
+   */
+  constructor(
+    private readonly env: Env,
+    private readonly userId?: string,
+  ) {}
 
   async requestJson<T>(schema: ZodType<T>, req: GoogleHealthRequest): Promise<T> {
     const body = await this.requestText(req);
@@ -60,7 +67,7 @@ export class GoogleHealthClient {
     const MAX_ATTEMPTS = 3; // original + one refresh retry + one rate-limit retry
     while (true) {
       attempt++;
-      const token = await getGoogleAccessToken(this.env);
+      const token = await getGoogleAccessToken(this.env, this.userId);
       const headers: Record<string, string> = {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
@@ -80,7 +87,7 @@ export class GoogleHealthClient {
       if (res.status === 401 && attempt === 1) {
         // token was rejected — force refresh and try once
         console.log(`[google-health] ${method} ${req.path} → 401 after ${ms}ms, refreshing token`);
-        await invalidateGoogleAccessToken(this.env);
+        await invalidateGoogleAccessToken(this.env, this.userId);
         continue;
       }
 

@@ -5,10 +5,14 @@ export const DEFAULT_CACHE_TTL_SEC = 60 * 60; // 1 hour
 /**
  * KV keys are namespaced by the active provider so switching
  * HEALTH_PROVIDER never serves cached data from the other backend
- * (shapes match, but ids and metric semantics differ).
+ * (shapes match, but ids and metric semantics differ), and — in
+ * multi-user mode — by the granting user, so one user's health data can
+ * never be served from another user's cache entry.
  */
 function namespacedKey(env: Env, key: string): string {
-  return `${env.HEALTH_PROVIDER === 'google_health' ? 'google_health' : 'fitbit'}:${key}`;
+  const provider = env.HEALTH_PROVIDER === 'google_health' ? 'google_health' : 'fitbit';
+  const user = env.CACHE_USER_NS ? `u:${env.CACHE_USER_NS}:` : '';
+  return `${provider}:${user}${key}`;
 }
 
 export async function getCached<T>(

@@ -49,6 +49,29 @@ describe('provider-namespaced cache storage', () => {
     ]);
   });
 
+  it('adds a user segment to keys when CACHE_USER_NS is set (multi-user mode)', async () => {
+    const aliceEnv = createMockEnv({}, {
+      HEALTH_PROVIDER: 'google_health',
+      CACHE_USER_NS: '10001',
+    } as never);
+    const bobEnv = createMockEnv({}, {
+      HEALTH_PROVIDER: 'google_health',
+      CACHE_USER_NS: '20002',
+    } as never);
+    (bobEnv as { CACHE: unknown }).CACHE = aliceEnv.CACHE;
+
+    await getCached(aliceEnv, 'get_sleep?date=2026-08-01', async () => 'alice-sleep');
+    const bobResult = await getCached(bobEnv, 'get_sleep?date=2026-08-01', async () => 'bob-sleep');
+
+    // Bob must never see Alice's cached health data
+    expect(bobResult).toBe('bob-sleep');
+    const store = (aliceEnv.CACHE as unknown as MockKv).__store;
+    expect([...store.keys()].sort()).toEqual([
+      'google_health:u:10001:get_sleep?date=2026-08-01',
+      'google_health:u:20002:get_sleep?date=2026-08-01',
+    ]);
+  });
+
   it('invalidate deletes the namespaced key', async () => {
     const env = createMockEnv({}, { HEALTH_PROVIDER: 'google_health' });
     await getCached(env, 'get_sleep?date=2026-07-31', async () => 'x');

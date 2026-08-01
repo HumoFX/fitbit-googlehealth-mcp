@@ -64,4 +64,12 @@ describe('selectProvider', () => {
       /HEALTH_PROVIDER/,
     );
   });
+
+  it('forces GoogleHealthProvider when a userId is given (multi-user requests)', () => {
+    // Multi-user grants only exist for Google Health; HEALTH_PROVIDER is
+    // irrelevant for per-user requests even if it still says fitbit.
+    expect(
+      selectProvider(createMockEnv({}, { HEALTH_PROVIDER: 'fitbit' }), '10001'),
+    ).toBeInstanceOf(GoogleHealthProvider);
+  });
 });

@@ -164,6 +164,27 @@ describe('GoogleHealthClient.requestJson', () => {
   });
 });
 
+describe('per-user client (multi-user mode)', () => {
+  it('authorizes with the per-user token when constructed with a userId', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const env = createMockEnv({
+      gh_u_10001_access_token: 'alice-token',
+      gh_u_10001_refresh_token: 'alice-refresh',
+      gh_u_10001_expires_at: String(Math.floor(Date.now() / 1000) + 3600),
+    });
+    const client = new GoogleHealthClient(env, '10001');
+    await client.requestJson(z.object({ ok: z.boolean() }), {
+      path: '/users/me/dataTypes/steps/dataPoints',
+    });
+
+    const call = fetchMock.mock.calls[0] as unknown as [URL | string, RequestInit];
+    const headers = call[1].headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer alice-token');
+  });
+});
+
 describe('paginate', () => {
   it('follows nextPageToken until exhausted and concatenates items', async () => {
     const pages: Record<string, { items: number[]; nextPageToken?: string }> = {

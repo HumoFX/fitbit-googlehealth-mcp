@@ -56,8 +56,8 @@ function notImplemented(method: string): never {
 export class GoogleHealthProvider implements HealthProvider {
   private readonly client: GoogleHealthClient;
 
-  constructor(env: Env) {
-    this.client = new GoogleHealthClient(env);
+  constructor(env: Env, userId?: string) {
+    this.client = new GoogleHealthClient(env, userId);
   }
 
   // ---------- Read: MVP ----------

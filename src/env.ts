@@ -10,4 +10,9 @@ export type Env = {
   /** Google Cloud OAuth client for the Google Health API provider. */
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  /**
+   * Set per request (never in wrangler.toml) to scope cache keys to the
+   * authenticated user in multi-user mode. Absent in single-user mode.
+   */
+  CACHE_USER_NS?: string;
 };

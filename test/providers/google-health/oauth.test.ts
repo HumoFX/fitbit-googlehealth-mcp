@@ -3,6 +3,7 @@ import { GoogleHealthAuthError } from '../../../src/lib/errors';
 import {
   getGoogleAccessToken,
   invalidateGoogleAccessToken,
+  persistGoogleTokens,
   refreshGoogleTokens,
   resetGoogleTokenMemory,
 } from '../../../src/providers/google-health/oauth';
@@ -182,6 +183,98 @@ describe('invalidateGoogleAccessToken', () => {
     });
     await invalidateGoogleAccessToken(env);
     expect(await env.TOKENS.get('gh_expires_at')).toBe('0');
+  });
+});
+
+describe('per-user token storage (multi-user mode)', () => {
+  beforeEach(() => {
+    resetGoogleTokenMemory();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-02T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('reads tokens from gh_u_<userId>_* keys when a userId is given', async () => {
+    const env = createMockEnv({
+      gh_u_10001_access_token: 'alice-token',
+      gh_u_10001_refresh_token: 'alice-refresh',
+      gh_u_10001_expires_at: String(Math.floor(Date.now() / 1000) + 3600),
+    });
+    const token = await getGoogleAccessToken(env, '10001');
+    expect(token).toBe('alice-token');
+  });
+
+  it('keeps token memory isolated between users', async () => {
+    const env = createMockEnv({
+      gh_u_10001_access_token: 'alice-token',
+      gh_u_10001_refresh_token: 'alice-refresh',
+      gh_u_10001_expires_at: String(Math.floor(Date.now() / 1000) + 3600),
+      gh_u_20002_access_token: 'bob-token',
+      gh_u_20002_refresh_token: 'bob-refresh',
+      gh_u_20002_expires_at: String(Math.floor(Date.now() / 1000) + 3600),
+    });
+
+    expect(await getGoogleAccessToken(env, '10001')).toBe('alice-token');
+    // Bob's read must not be served from Alice's warmed memory
+    expect(await getGoogleAccessToken(env, '20002')).toBe('bob-token');
+    // and repeat reads still return the right per-user token from memory
+    expect(await getGoogleAccessToken(env, '10001')).toBe('alice-token');
+  });
+
+  it('refreshes and persists under the per-user keys only', async () => {
+    const fetchMock = vi.fn(async () =>
+      tokenResponse({ access_token: 'alice-new', expires_in: 3599, token_type: 'Bearer' }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const env = createMockEnv({
+      gh_u_10001_access_token: 'stale',
+      gh_u_10001_refresh_token: 'alice-refresh',
+      gh_u_10001_expires_at: '0',
+      gh_access_token: 'single-user-untouched',
+      gh_refresh_token: 'single-user-refresh',
+      gh_expires_at: '9999999999',
+    });
+
+    const token = await getGoogleAccessToken(env, '10001');
+    expect(token).toBe('alice-new');
+    expect(await env.TOKENS.get('gh_u_10001_access_token')).toBe('alice-new');
+    // the single-user keys are untouched
+    expect(await env.TOKENS.get('gh_access_token')).toBe('single-user-untouched');
+  });
+
+  it('persistGoogleTokens seeds a new user bundle (used by the OAuth callback)', async () => {
+    const env = createMockEnv();
+    await persistGoogleTokens(env, '30003', {
+      accessToken: 'carol-token',
+      refreshToken: 'carol-refresh',
+      expiresAt: 1785700000,
+    });
+    expect(await env.TOKENS.get('gh_u_30003_access_token')).toBe('carol-token');
+    expect(await env.TOKENS.get('gh_u_30003_refresh_token')).toBe('carol-refresh');
+    expect(await env.TOKENS.get('gh_u_30003_expires_at')).toBe('1785700000');
+    // and the freshly seeded bundle is immediately usable
+    vi.setSystemTime(new Date(1785700000 * 1000 - 3600 * 1000));
+    expect(await getGoogleAccessToken(env, '30003')).toBe('carol-token');
+  });
+
+  it("invalidate for one user does not clear another user's memory", async () => {
+    const env = createMockEnv({
+      gh_u_10001_access_token: 'alice-token',
+      gh_u_10001_refresh_token: 'alice-refresh',
+      gh_u_10001_expires_at: String(Math.floor(Date.now() / 1000) + 3600),
+    });
+    await getGoogleAccessToken(env, '10001');
+    await invalidateGoogleAccessToken(env, '20002');
+    // Alice is still served from memory without new KV reads
+    const kvGets = (env.TOKENS as unknown as MockKv).get.mock.calls.length;
+    expect(await getGoogleAccessToken(env, '10001')).toBe('alice-token');
+    expect((env.TOKENS as unknown as MockKv).get.mock.calls.length).toBe(kvGets);
+    // and the right user's expiry was zeroed
+    expect(await env.TOKENS.get('gh_u_20002_expires_at')).toBe('0');
   });
 });
 

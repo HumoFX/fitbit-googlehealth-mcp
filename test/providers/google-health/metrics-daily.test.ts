@@ -82,7 +82,7 @@ describe('getSkinTemperature', () => {
           dailySleepTemperatureDerivations: {
             date: { year: 2026, month: 8, day: 1 },
             nightlyTemperatureCelsius: 33.8,
-            relativeNightlyStddev30dCelsius: -0.4,
+            relativeNightlyStddev30dCelsius: 0.25,
             baselineTemperatureCelsius: 34.2,
           },
         },
@@ -97,12 +97,37 @@ describe('getSkinTemperature', () => {
       {
         dateTime: '2026-08-01',
         value: {
+          // Fitbit's nightlyRelative is the delta from baseline, so it is
+          // computed here: 33.8 − 34.2. The API's
+          // relativeNightlyStddev30dCelsius is a 30-day standard deviation
+          // and must never be reported as tonight's deviation.
           nightlyRelative: -0.4,
           nightlyAbsoluteCelsius: 33.8,
           baselineCelsius: 34.2,
+          relativeStddev30d: 0.25,
         },
       },
     ]);
+  });
+
+  it('leaves nightlyRelative absent when there is no baseline to subtract', async () => {
+    stubList({
+      dataPoints: [
+        {
+          dailySleepTemperatureDerivations: {
+            date: { year: 2026, month: 8, day: 1 },
+            nightlyTemperatureCelsius: 33.8,
+          },
+        },
+      ],
+    });
+
+    const days = await new GoogleHealthProvider(envWithFreshToken()).getSkinTemperature(
+      '2026-08-01',
+      '2026-08-01',
+    );
+    expect(days[0]?.value.nightlyRelative).toBeUndefined();
+    expect(days[0]?.value.nightlyAbsoluteCelsius).toBe(33.8);
   });
 });
 

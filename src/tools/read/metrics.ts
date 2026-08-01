@@ -22,7 +22,8 @@ export function registerMetricsReadTools(
     'get_spo2',
     {
       title: 'Blood oxygen saturation (SpO2)',
-      description: 'Nightly SpO2 averages (min / avg / max) across a date range. Cached 1h.',
+      description:
+        'Nightly SpO2 across a date range. Cached 1h. NOTE: under the google_health provider `min` and `max` are the confidence-interval bounds the API reports, not the lowest and highest observed readings, so brief desaturations may sit outside them.',
       inputSchema: {
         start: z.string().describe('YYYY-MM-DD'),
         end: z.string().describe('YYYY-MM-DD'),

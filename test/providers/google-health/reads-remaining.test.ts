@@ -54,8 +54,24 @@ describe('downsample', () => {
     ]);
   });
 
-  it('passes samples through at 1sec', () => {
-    expect(downsample(points, '1sec')).toEqual(points);
+  it('still buckets at 1sec, so duplicate-second samples collapse', () => {
+    // A raw all-day stream at ~5s cadence is ~17k points; handing that to
+    // the model would blow the response budget the tool layer exists to
+    // protect. 1sec is a resolution, not an escape hatch.
+    const sameSecond = [
+      { time: '00:00:00', value: 60 },
+      { time: '00:00:00', value: 64 },
+    ];
+    expect(downsample(sameSecond, '1sec')).toEqual([{ time: '00:00:00', value: 62 }]);
+  });
+
+  it('caps the returned series so a full day can never flood the response', () => {
+    const dense = Array.from({ length: 5000 }, (_, i) => ({
+      time: `${String(Math.floor(i / 3600)).padStart(2, '0')}:${String(Math.floor((i % 3600) / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}`,
+      value: 60,
+    }));
+    const out = downsample(dense, '1sec');
+    expect(out.length).toBeLessThanOrEqual(1440);
   });
 });
 

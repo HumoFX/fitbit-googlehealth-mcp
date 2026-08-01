@@ -49,7 +49,7 @@ export function registerHeartReadTools(
     {
       title: 'Intraday heart rate for one day',
       description:
-        'Time-series heart rate for a single day at the requested resolution. 1sec is only reliable during logged exercises; 1min is best for all-day trends. Personal Fitbit apps have immediate intraday access. NOTE: Fitbit itself sometimes returns an empty or partial dataset even when heart-rate zone summaries are complete — this is especially common on days with logged exercise sessions, where Fitbit appears to prune intraday points around the workout interval. The `restingHeartRate` and `heartRateZones` fields remain reliable regardless, so fall back to `get_heart_rate_range` for trending when `points` is empty.',
+        'Time-series heart rate for a single day at the requested resolution; 1min is best for all-day trends. The series is aggregated and capped, so it is a shape of the day rather than every raw sample. Under the fitbit provider the dataset is sometimes empty or partial even when zone summaries are complete (Fitbit prunes points around logged workouts); under google_health the samples are whatever the device recorded, averaged into the requested buckets. `restingHeartRate` and `heartRateZones` are reliable either way, so fall back to `get_heart_rate_range` when `points` is empty.',
       inputSchema: {
         date: z.string().describe('YYYY-MM-DD'),
         detailLevel: IntradayDetailLevel.describe(

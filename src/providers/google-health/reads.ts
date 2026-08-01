@@ -14,12 +14,18 @@ const SESSION_PAGE_SIZE = 25;
 
 /** Fitbit meal ids, so existing consumers of `mealTypeId` keep working. */
 const MEAL_TYPE_IDS: Record<string, number> = {
+  BEFORE_BREAKFAST: 1,
   BREAKFAST: 1,
   BEFORE_LUNCH: 2,
   LUNCH: 3,
   BEFORE_DINNER: 4,
   DINNER: 5,
+  // Fitbit had no evening-snack or generic-snack slot; both land on
+  // Anytime rather than dropping the field.
+  AFTER_DINNER: 7,
+  SNACK: 7,
   ANYTIME: 7,
+  MEAL_TYPE_UNSPECIFIED: 7,
 };
 
 const SampleTimeSchema = z.object({
@@ -83,6 +89,9 @@ export async function getExerciseList(
   opts: { beforeDate?: string; limit?: number } = {},
 ): Promise<ExerciseLog[]> {
   const end = opts.beforeDate ?? new Date().toISOString().slice(0, 10);
+  // The API filters instead of paging by offset, so recall is a window
+  // rather than an offset. 90 days is the maximum range the API accepts
+  // for a single query; `limit` then trims the newest rows from it.
   const start = new Date(Date.parse(`${end}T00:00:00Z`) - 89 * 86_400_000)
     .toISOString()
     .slice(0, 10);

@@ -643,11 +643,18 @@ so a missing scope degrades the answer instead of failing it. What Google
 simply does not have: display name, date of birth, height, weight,
 average daily steps.
 
-**Devices** — the biggest loss of the whole migration relative to
-usefulness. `pairedDevices` returns name, form factor and manufacturer.
-No battery level, no last-sync time — which is essentially the only
-reason anyone called Fitbit's device list. Nothing to be done; documented
-in the README table.
+**Devices** — I got this wrong on the first pass and the review caught
+it. I modelled the response on the Discovery `Device` schema, which is the
+per-datapoint provenance object (display name, form factor, manufacturer),
+when the list actually returns `PairedDevice`: name, deviceVersion,
+deviceType, **batteryLevel, batteryStatus, lastSyncTime**, macAddress and
+features. So the "biggest loss of the migration" I wrote here was a
+fabrication — everything Fitbit's device list was used for carries over.
+Worse, the mismatch failed *silently*: zod strips unknown keys, so the
+parse succeeded and every field mapped to `undefined`. The fixture I wrote
+encoded the same wrong shape, so the test went green against a wire format
+the API never sends. Lesson: when a test fixture is authored from the same
+reading as the code, it validates the reading, not the code.
 
 **Intraday heart rate** — the research note held up: there are no
 `detailLevel` buckets. The API returns native samples (~5s cadence) and
@@ -665,3 +672,31 @@ With this the provider implements every `HealthProvider` method, so the
 `notImplemented` escape hatch is deleted and a test asserts parity
 against the Fitbit provider's prototype — a stub reappearing would now
 fail the suite rather than surface as a runtime error on someone's phone.
+
+### Review findings on the read surface
+
+Two data-correctness bugs, both silent:
+
+- **Devices modelled on the wrong schema** (above) — every field came back
+  `undefined` against the real API.
+- **Skin temperature reported a standard deviation as tonight's delta.**
+  `relativeNightlyStddev30dCelsius` is, per its own description, "the
+  standard deviation of the user's relative nightly skin temperature over
+  the past 30 days" — a dispersion measure, always positive-ish and slow
+  moving. Fitbit's `nightlyRelative` is tonight's deviation from baseline.
+  Feeding one into the other would have produced plausible-looking numbers
+  that mean something entirely different, which is the worst failure mode
+  for health data. It is now computed as `nightly − baseline`, with the
+  stddev exposed separately under its own name.
+
+And one that violated a stated constraint: `detailLevel: '1sec'` passed the
+raw sample array straight through. A day at ~5s cadence is ~17k points —
+exactly the "no raw intraday arrays" case the tool layer exists to prevent.
+Every resolution now buckets, and the series is capped at 1440 points with
+even thinning so the shape of the day survives.
+
+Also fixed: intraday now reads through `:reconcile` rather than the raw
+list, so a user with two data sources does not get their samples doubled;
+`mealTypeId` covers all ten meal enum values instead of six; and `tryGet`
+in the profile composite no longer swallows auth or 5xx failures, which
+would have reported an empty profile as success and cached it for an hour.

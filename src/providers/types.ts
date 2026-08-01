@@ -320,6 +320,8 @@ export const SkinTempDaySchema = z.object({
     // baseline it is compared against; Fitbit only ever sent the delta.
     nightlyAbsoluteCelsius: z.number().optional(),
     baselineCelsius: z.number().optional(),
+    /** 30-day standard deviation of the nightly deviation, not tonight's. */
+    relativeStddev30d: z.number().optional(),
   }),
   logType: z.string().optional(),
 });

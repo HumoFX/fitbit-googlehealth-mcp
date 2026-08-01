@@ -48,7 +48,7 @@ invented:
 | Area | Missing under Google Health |
 |---|---|
 | Profile | display name, date of birth, height, weight, average daily steps (Google returns age and stride lengths instead) |
-| Devices | battery level and last-sync time — Google exposes only name, form factor and manufacturer |
+| Devices | nothing — battery level/status, last-sync time, MAC and features all carry over |
 | Daily summary | goals, `caloriesBMR`, `marginalCalories`, per-zone `caloriesOut` |
 | Sleep | `efficiency`, `infoCode` |
 | Breathing rate | the per-sleep-stage breakdown (Google keeps it in a separate data type) |
@@ -56,8 +56,9 @@ invented:
 
 Semantics that differ rather than disappear: heart-rate zones are named
 Light/Moderate/Vigorous/Peak with Karvonen thresholds; skin temperature
-gains an absolute nightly reading and baseline next to the relative
-deviation; intraday heart rate has no server-side `detailLevel`, so
+reports the nightly deviation from baseline (computed here, since Google
+sends the absolute reading and the baseline separately) plus a 30-day
+standard deviation Fitbit never had; intraday heart rate has no server-side `detailLevel`, so
 native samples are averaged into the requested resolution client-side.
 
 Nutrition writes are the clearest win of the migration: Google takes

@@ -204,9 +204,17 @@ export function getSkinTemperature(
       map: (w, date) => ({
         dateTime: date,
         value: {
-          nightlyRelative: w.relativeNightlyStddev30dCelsius,
+          // Fitbit's nightlyRelative is tonight's deviation from baseline,
+          // which Google leaves to the caller: the API's
+          // relativeNightlyStddev30dCelsius is a 30-day standard deviation,
+          // not a nightly delta, and reporting it as one would be wrong.
+          nightlyRelative:
+            w.nightlyTemperatureCelsius !== undefined && w.baselineTemperatureCelsius !== undefined
+              ? Math.round((w.nightlyTemperatureCelsius - w.baselineTemperatureCelsius) * 100) / 100
+              : undefined,
           nightlyAbsoluteCelsius: w.nightlyTemperatureCelsius,
           baselineCelsius: w.baselineTemperatureCelsius,
+          relativeStddev30d: w.relativeNightlyStddev30dCelsius,
         },
       }),
     },

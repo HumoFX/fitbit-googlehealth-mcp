@@ -64,7 +64,7 @@ describe('getProfile', () => {
 });
 
 describe('listDevices', () => {
-  it('maps paired devices, leaving battery and sync time absent', async () => {
+  it('maps every PairedDevice field, battery and sync time included', async () => {
     const fetchMock = vi.fn(
       async (_input: string | URL) =>
         new Response(
@@ -72,9 +72,13 @@ describe('listDevices', () => {
             pairedDevices: [
               {
                 name: 'users/me/pairedDevices/dev-1',
-                displayName: 'Fitbit Air',
-                formFactor: 'WATCH',
-                manufacturer: 'Google',
+                deviceVersion: 'Charge 6',
+                deviceType: 'TRACKER',
+                batteryLevel: 72,
+                batteryStatus: 'High',
+                lastSyncTime: '2026-08-01T09:12:00Z',
+                macAddress: 'AA:BB:CC:DD:EE:FF',
+                features: ['STEPS', 'HEART_RATE'],
               },
             ],
           }),
@@ -85,20 +89,35 @@ describe('listDevices', () => {
 
     const devices = await new GoogleHealthProvider(envWithFreshToken()).listDevices();
 
-    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).pathname).toBe(
-      '/v4/users/me/pairedDevices',
-    );
+    const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(url.pathname).toBe('/v4/users/me/pairedDevices');
+    // The API defaults to a small page; ask for all of them.
+    expect(url.searchParams.get('pageSize')).toBe('100');
     expect(devices).toEqual([
       {
         id: 'users/me/pairedDevices/dev-1',
-        deviceVersion: 'Fitbit Air',
-        type: 'WATCH',
-        // Google exposes no battery level or last-sync time for paired
-        // devices — the fields Fitbit's list was mostly used for.
-        battery: undefined,
-        batteryLevel: undefined,
-        lastSyncTime: undefined,
+        deviceVersion: 'Charge 6',
+        type: 'TRACKER',
+        battery: 'High',
+        batteryLevel: 72,
+        lastSyncTime: '2026-08-01T09:12:00Z',
+        mac: 'AA:BB:CC:DD:EE:FF',
+        features: ['STEPS', 'HEART_RATE'],
       },
     ]);
+  });
+
+  it('follows pagination so devices beyond the first page are not dropped', async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const token = new URL(String(input)).searchParams.get('pageToken');
+      const body = token
+        ? { pairedDevices: [{ name: 'd2', deviceVersion: 'Scale' }] }
+        : { pairedDevices: [{ name: 'd1', deviceVersion: 'Charge 6' }], nextPageToken: 'p2' };
+      return new Response(JSON.stringify(body), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const devices = await new GoogleHealthProvider(envWithFreshToken()).listDevices();
+    expect(devices.map((d) => d.id)).toEqual(['d1', 'd2']);
   });
 });

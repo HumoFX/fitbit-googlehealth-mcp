@@ -1,6 +1,11 @@
 import { z } from 'zod';
+import {
+  GoogleHealthApiError,
+  GoogleHealthAuthError,
+  GoogleHealthRateLimitError,
+} from '../../lib/errors';
 import type { Device, Profile } from '../types';
-import type { GoogleHealthClient } from './client';
+import { type GoogleHealthClient, paginate } from './client';
 import { GhDateSchema, ghDateToIso } from './wire';
 
 const IdentitySchema = z.object({
@@ -22,7 +27,12 @@ const SettingsSchema = z.object({
   languageLocale: z.string().optional(),
 });
 
-/** Optional sub-request: a missing scope or empty resource must not sink the call. */
+/**
+ * Optional sub-request: an empty or forbidden *resource* must not sink the
+ * whole profile, but auth and rate-limit failures are real and must
+ * propagate — swallowing them would report a blank profile as success and
+ * then cache it for an hour.
+ */
 async function tryGet<T>(
   client: GoogleHealthClient,
   schema: z.ZodType<T>,
@@ -30,7 +40,13 @@ async function tryGet<T>(
 ): Promise<T | undefined> {
   try {
     return await client.requestJson(schema, { path });
-  } catch {
+  } catch (err) {
+    if (err instanceof GoogleHealthAuthError || err instanceof GoogleHealthRateLimitError) {
+      throw err;
+    }
+    if (err instanceof GoogleHealthApiError && err.status >= 500) {
+      throw err;
+    }
     return undefined;
   }
 }
@@ -67,30 +83,41 @@ const PairedDevicesResponseSchema = z.object({
     .array(
       z.object({
         name: z.string().optional(),
-        displayName: z.string().optional(),
-        formFactor: z.string().optional(),
-        manufacturer: z.string().optional(),
+        deviceVersion: z.string().optional(),
+        deviceType: z.string().optional(), // TRACKER | SCALE
+        batteryLevel: z.number().optional(),
+        batteryStatus: z.string().optional(), // High | Medium | Low | Empty
+        lastSyncTime: z.string().optional(),
+        macAddress: z.string().optional(),
+        features: z.array(z.string()).optional(),
       }),
     )
     .optional(),
   nextPageToken: z.string().optional(),
 });
 
-/**
- * Paired devices carry only a name, form factor and manufacturer — Google
- * publishes no battery level or last-sync time, which is most of what
- * Fitbit's device list was consulted for.
- */
+// The endpoint's default page is small; one page of 100 covers any
+// plausible number of paired devices, and pagination is followed anyway.
+const DEVICES_PAGE_SIZE = 100;
+
+/** Paired devices, including battery state and last-sync time. */
 export async function listDevices(client: GoogleHealthClient): Promise<Device[]> {
-  const response = await client.requestJson(PairedDevicesResponseSchema, {
-    path: '/users/me/pairedDevices',
+  const { items } = await paginate(async (pageToken) => {
+    const response = await client.requestJson(PairedDevicesResponseSchema, {
+      path: '/users/me/pairedDevices',
+      query: { pageSize: DEVICES_PAGE_SIZE, pageToken },
+    });
+    return { items: response.pairedDevices ?? [], nextPageToken: response.nextPageToken };
   });
-  return (response.pairedDevices ?? []).map((device) => ({
+
+  return items.map((device) => ({
     id: device.name ?? '',
-    deviceVersion: device.displayName,
-    type: device.formFactor,
-    battery: undefined,
-    batteryLevel: undefined,
-    lastSyncTime: undefined,
+    deviceVersion: device.deviceVersion,
+    type: device.deviceType,
+    battery: device.batteryStatus,
+    batteryLevel: device.batteryLevel,
+    lastSyncTime: device.lastSyncTime,
+    mac: device.macAddress,
+    features: device.features,
   }));
 }

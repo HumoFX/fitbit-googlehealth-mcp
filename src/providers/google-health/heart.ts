@@ -235,17 +235,23 @@ function secondsToTime(total: number): string {
   return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`;
 }
 
+// A day of native (~5s) samples is ~17k points. Tool responses must stay
+// aggregated, so even the finest resolution is capped at a day's worth of
+// minute-level buckets.
+const MAX_POINTS = 1440;
+
 /**
  * Average native samples into fixed buckets. The API has no detailLevel
  * parameter — it returns roughly one sample every few seconds — so the
- * resolution Fitbit callers ask for is produced client-side.
+ * resolution Fitbit callers ask for is produced client-side. `1sec` buckets
+ * per second rather than passing the raw stream through, and the result is
+ * thinned further if it would still exceed MAX_POINTS.
  */
 export function downsample(
   points: HeartRateIntradayPoint[],
   detailLevel: IntradayDetailLevelT,
 ): HeartRateIntradayPoint[] {
   const bucket = BUCKET_SECONDS[detailLevel];
-  if (bucket <= 1) return points;
 
   const sums = new Map<number, { sum: number; count: number }>();
   for (const point of points) {
@@ -256,15 +262,22 @@ export function downsample(
     sums.set(slot, acc);
   }
 
-  return [...sums.entries()]
+  const series = [...sums.entries()]
     .sort(([a], [b]) => a - b)
     .map(([slot, acc]) => ({ time: secondsToTime(slot), value: Math.round(acc.sum / acc.count) }));
+
+  if (series.length <= MAX_POINTS) return series;
+  // Keep an evenly spaced subset rather than truncating the tail, so the
+  // shape of the day survives.
+  const stride = Math.ceil(series.length / MAX_POINTS);
+  return series.filter((_, index) => index % stride === 0);
 }
 
 const HeartRateListResponseSchema = z.object({
   dataPoints: z
     .array(
       z.object({
+        dataPointName: z.string().optional(),
         heartRate: z
           .object({
             sampleTime: z.object({
@@ -293,8 +306,10 @@ export async function getHeartRateIntraday(
   const filter = civilRangeFilter('heart_rate.sample_time.civil_time', date, date);
   const [samples, rhrByDate, zonesByDate, minutesByDate] = await Promise.all([
     paginate(async (pageToken) => {
+      // :reconcile merges overlapping samples across sources; the raw list
+      // would return one series per writer and inflate the day severalfold.
       const response = await client.requestJson(HeartRateListResponseSchema, {
-        path: '/users/me/dataTypes/heart-rate/dataPoints',
+        path: '/users/me/dataTypes/heart-rate/dataPoints:reconcile',
         query: { filter, pageSize: 10000, pageToken },
       });
       return { items: response.dataPoints ?? [], nextPageToken: response.nextPageToken };

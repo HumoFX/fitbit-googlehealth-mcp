@@ -36,14 +36,26 @@ import { GoogleHealthClient } from './client';
 import { getHeartRateRange } from './heart';
 import { getHRV } from './metrics';
 import { getSleep, getSleepRange } from './sleep';
+import {
+  deleteByType,
+  logActivity,
+  logBodyFat,
+  logFood,
+  logMeal,
+  logSleep,
+  logWater,
+  logWeight,
+} from './write-domains';
 
-const MVP_READS =
-  'get_sleep, get_sleep_range, get_daily_summary, get_activity_timeseries, get_heart_rate_range, get_hrv';
+const SUPPORTED =
+  'reads: get_sleep, get_sleep_range, get_daily_summary, get_activity_timeseries, ' +
+  'get_heart_rate_range, get_hrv; writes: log_food, log_meal_photo, log_water, log_weight, ' +
+  'log_body_fat, log_activity, log_sleep and the matching deletes';
 
 function notImplemented(method: string): never {
   throw new Error(
     `${method} is not implemented by the google_health provider yet ` +
-      `(current MVP is read-only: ${MVP_READS}). ` +
+      `(supported: ${SUPPORTED}). ` +
       'Set HEALTH_PROVIDER=fitbit for full coverage until the Fitbit Web API turndown (September 2026).',
   );
 }
@@ -120,44 +132,44 @@ export class GoogleHealthProvider implements HealthProvider {
     notImplemented('get_cardio_fitness');
   }
 
-  // ---------- Write: not ported yet ----------
-  async logFood(_input: LogFoodInput): Promise<FoodLogEntry> {
-    notImplemented('log_food');
+  // ---------- Write ----------
+  logFood(input: LogFoodInput): Promise<FoodLogEntry> {
+    return logFood(this.client, input);
   }
-  async logMeal(_input: LogMealInput): Promise<FoodLogEntry[]> {
-    notImplemented('log_meal_photo');
+  logMeal(input: LogMealInput): Promise<FoodLogEntry[]> {
+    return logMeal(this.client, input);
   }
-  async logWater(_input: LogWaterInput): Promise<WaterLogEntry> {
-    notImplemented('log_water');
+  logWater(input: LogWaterInput): Promise<WaterLogEntry> {
+    return logWater(this.client, input);
   }
-  async logWeight(_input: LogWeightInput): Promise<WeightLog> {
-    notImplemented('log_weight');
+  logWeight(input: LogWeightInput): Promise<WeightLog> {
+    return logWeight(this.client, input);
   }
-  async logBodyFat(_input: LogBodyFatInput): Promise<BodyFatLog> {
-    notImplemented('log_body_fat');
+  logBodyFat(input: LogBodyFatInput): Promise<BodyFatLog> {
+    return logBodyFat(this.client, input);
   }
-  async logActivity(_input: LogActivityInput): Promise<ExerciseLog> {
-    notImplemented('log_activity');
+  logActivity(input: LogActivityInput): Promise<ExerciseLog> {
+    return logActivity(this.client, input);
   }
-  async logSleep(_input: LogSleepInput): Promise<SleepLog> {
-    notImplemented('log_sleep');
+  logSleep(input: LogSleepInput): Promise<SleepLog> {
+    return logSleep(this.client, input);
   }
-  async deleteFoodLog(_logId: LogId): Promise<void> {
-    notImplemented('delete_food_log');
+  deleteFoodLog(logId: LogId): Promise<void> {
+    return deleteByType(this.client, 'food', logId);
   }
-  async deleteWaterLog(_logId: LogId): Promise<void> {
-    notImplemented('delete_water_log');
+  deleteWaterLog(logId: LogId): Promise<void> {
+    return deleteByType(this.client, 'water', logId);
   }
-  async deleteWeightLog(_logId: LogId): Promise<void> {
-    notImplemented('delete_weight_log');
+  deleteWeightLog(logId: LogId): Promise<void> {
+    return deleteByType(this.client, 'weight', logId);
   }
-  async deleteBodyFatLog(_logId: LogId): Promise<void> {
-    notImplemented('delete_body_fat_log');
+  deleteBodyFatLog(logId: LogId): Promise<void> {
+    return deleteByType(this.client, 'bodyFat', logId);
   }
-  async deleteActivityLog(_logId: LogId): Promise<void> {
-    notImplemented('delete_activity_log');
+  deleteActivityLog(logId: LogId): Promise<void> {
+    return deleteByType(this.client, 'activity', logId);
   }
-  async deleteSleepLog(_logId: LogId): Promise<void> {
-    notImplemented('delete_sleep_log');
+  deleteSleepLog(logId: LogId): Promise<void> {
+    return deleteByType(this.client, 'sleep', logId);
   }
 }

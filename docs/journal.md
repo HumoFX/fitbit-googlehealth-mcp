@@ -605,3 +605,26 @@ Google splits read and write into separate families, so the new tools
 would 403 against any grant issued before today. Both consent flows now
 request the four `*.writeonly` scopes; existing grants must reconnect,
 which `prompt=consent` already forces.
+
+### Live probe of the write layer
+
+Two real bugs that only a live write could find:
+
+1. **Zero-length intervals are rejected.** `SessionTimeInterval` on an
+   instantaneous log (hydration, food) had `startTime === endTime`, and the
+   API answers `400 INVALID_ARGUMENT: Data point start time must be
+   strictly earlier than end time.` Point-in-time entries now span a
+   minute.
+2. **`delete_food_log` still advertised a numeric logId.** Its input schema
+   was written across several lines and escaped the `LogId` sweep, so a
+   Google food entry — identified by a resource name — could be created but
+   never deleted.
+
+Also worth knowing: the KV key uses the OIDC `sub`
+(`gh_u_1019…`), while the resource names the API returns embed a
+*different*, internal Google user id (`users/4300…/dataTypes/…`). Both are
+stable; they simply are not the same number, so never derive one from the
+other.
+
+After the fixes: logged 250 ml of water and a 650 kcal meal with full
+macros, both accepted, both deleted again via `:batchDelete`.

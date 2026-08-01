@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { GoogleHealthApiError, GoogleHealthRateLimitError } from '../../../src/lib/errors';
 import { GoogleHealthClient, paginate } from '../../../src/providers/google-health/client';
+import { resetGoogleTokenMemory } from '../../../src/providers/google-health/oauth';
 import { createMockEnv } from '../../helpers/mock-env';
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -21,6 +22,7 @@ function jsonResponse(body: unknown, status = 200, headers: Record<string, strin
 
 afterEach(() => {
   vi.restoreAllMocks();
+  resetGoogleTokenMemory();
 });
 
 describe('GoogleHealthClient.requestJson', () => {

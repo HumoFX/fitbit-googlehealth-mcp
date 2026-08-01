@@ -29,6 +29,21 @@ export type GoogleTokenBundle = {
   expiresAt: number; // unix seconds
 };
 
+// Per-isolate token memory. A composite tool call fires ~10 parallel API
+// requests through getGoogleAccessToken; without this they would each read
+// 3 KV keys (subrequest budget) and, on expiry, stampede the token endpoint
+// with concurrent KV writes to the same keys (KV allows ~1 write/sec/key).
+// Memory is only ever a copy of what KV holds, so a stale isolate at worst
+// triggers the client's 401 → invalidate → refresh path.
+let memoryToken: { accessToken: string; expiresAt: number } | null = null;
+let refreshInFlight: Promise<GoogleTokenBundle> | null = null;
+
+/** Test-only: clear the per-isolate token memory between test cases. */
+export function resetGoogleTokenMemory(): void {
+  memoryToken = null;
+  refreshInFlight = null;
+}
+
 async function readStoredTokens(env: Env): Promise<GoogleTokenBundle> {
   const [accessToken, refreshToken, expiresAtRaw] = await Promise.all([
     env.TOKENS.get(KV_ACCESS),
@@ -104,31 +119,45 @@ export async function refreshGoogleTokens(
   const issuedAtSec = Math.floor(Date.now() / 1000);
   await persistTokens(env, parsed, nextRefreshToken, issuedAtSec);
 
-  return {
+  const bundle = {
     accessToken: parsed.access_token,
     refreshToken: nextRefreshToken,
     expiresAt: issuedAtSec + parsed.expires_in,
   };
+  memoryToken = { accessToken: bundle.accessToken, expiresAt: bundle.expiresAt };
+  return bundle;
 }
 
 /**
  * Returns a currently-valid Google access token, refreshing it when within
- * REFRESH_SKEW_SEC of expiry. Safe to call on every API request.
- *
- * Concurrency note: Google refresh tokens are not single-use, so two
- * simultaneous refreshes both succeed independently — no KV-CAS lock needed.
+ * REFRESH_SKEW_SEC of expiry. Safe to call on every API request: repeat
+ * calls are served from per-isolate memory, and concurrent refreshes are
+ * coalesced into a single token request (single-flight).
  */
 export async function getGoogleAccessToken(env: Env): Promise<string> {
-  const current = await readStoredTokens(env);
   const now = Math.floor(Date.now() / 1000);
-  if (current.expiresAt - REFRESH_SKEW_SEC > now) {
-    return current.accessToken;
+  if (memoryToken && memoryToken.expiresAt - REFRESH_SKEW_SEC > now) {
+    return memoryToken.accessToken;
   }
-  const refreshed = await refreshGoogleTokens(env, current.refreshToken);
-  return refreshed.accessToken;
+
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      const current = await readStoredTokens(env);
+      if (current.expiresAt - REFRESH_SKEW_SEC > now) {
+        memoryToken = { accessToken: current.accessToken, expiresAt: current.expiresAt };
+        return current;
+      }
+      return refreshGoogleTokens(env, current.refreshToken);
+    })().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  const bundle = await refreshInFlight;
+  return bundle.accessToken;
 }
 
 /** Force the next `getGoogleAccessToken()` to refresh. Used after an unexpected 401. */
 export async function invalidateGoogleAccessToken(env: Env): Promise<void> {
+  memoryToken = null;
   await env.TOKENS.put(KV_EXPIRES, '0');
 }

@@ -4,8 +4,9 @@ import {
   getGoogleAccessToken,
   invalidateGoogleAccessToken,
   refreshGoogleTokens,
+  resetGoogleTokenMemory,
 } from '../../../src/providers/google-health/oauth';
-import { createMockEnv } from '../../helpers/mock-env';
+import { createMockEnv, type MockKv } from '../../helpers/mock-env';
 
 function tokenResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), { status });
@@ -13,6 +14,7 @@ function tokenResponse(body: Record<string, unknown>, status = 200): Response {
 
 describe('getGoogleAccessToken', () => {
   beforeEach(() => {
+    resetGoogleTokenMemory();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-01T12:00:00Z'));
   });
@@ -72,6 +74,7 @@ describe('getGoogleAccessToken', () => {
 
 describe('refreshGoogleTokens', () => {
   beforeEach(() => {
+    resetGoogleTokenMemory();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-01T12:00:00Z'));
   });
@@ -179,5 +182,82 @@ describe('invalidateGoogleAccessToken', () => {
     });
     await invalidateGoogleAccessToken(env);
     expect(await env.TOKENS.get('gh_expires_at')).toBe('0');
+  });
+});
+
+describe('token memory and single-flight refresh', () => {
+  beforeEach(() => {
+    resetGoogleTokenMemory();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-01T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('coalesces concurrent refreshes into a single token request', async () => {
+    // A composite tool call fires ~10 parallel API requests; if the token is
+    // expired they must not each hit the token endpoint and hammer the same
+    // KV keys (Cloudflare KV allows ~1 write/sec/key).
+    let releaseFetch: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseFetch = resolve;
+    });
+    const fetchMock = vi.fn(async () => {
+      await gate;
+      return tokenResponse({ access_token: 'herd-token', expires_in: 3599, token_type: 'Bearer' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const env = createMockEnv({
+      gh_access_token: 'expired',
+      gh_refresh_token: 'refresh-x',
+      gh_expires_at: String(Math.floor(Date.now() / 1000) - 10),
+    });
+
+    const pending = Promise.all(Array.from({ length: 5 }, () => getGoogleAccessToken(env)));
+    releaseFetch();
+    const tokens = await pending;
+
+    expect(tokens).toEqual(Array.from({ length: 5 }, () => 'herd-token'));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const puts = (env.TOKENS as unknown as MockKv).put.mock.calls;
+    expect(puts.filter(([key]) => key === 'gh_access_token')).toHaveLength(1);
+  });
+
+  it('serves repeat calls from memory without re-reading KV', async () => {
+    const env = createMockEnv({
+      gh_access_token: 'memo-token',
+      gh_refresh_token: 'r',
+      gh_expires_at: String(Math.floor(Date.now() / 1000) + 3600),
+    });
+
+    await getGoogleAccessToken(env);
+    const kvGets = (env.TOKENS as unknown as MockKv).get.mock.calls.length;
+    const again = await getGoogleAccessToken(env);
+
+    expect(again).toBe('memo-token');
+    expect((env.TOKENS as unknown as MockKv).get.mock.calls.length).toBe(kvGets);
+  });
+
+  it('invalidateGoogleAccessToken drops the memory cache too', async () => {
+    const fetchMock = vi.fn(async () =>
+      tokenResponse({ access_token: 'after-401', expires_in: 3599, token_type: 'Bearer' }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const env = createMockEnv({
+      gh_access_token: 'rejected-by-api',
+      gh_refresh_token: 'r',
+      gh_expires_at: String(Math.floor(Date.now() / 1000) + 3600),
+    });
+
+    await getGoogleAccessToken(env);
+    await invalidateGoogleAccessToken(env);
+    const token = await getGoogleAccessToken(env);
+
+    expect(token).toBe('after-401');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

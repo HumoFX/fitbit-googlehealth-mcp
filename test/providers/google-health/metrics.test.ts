@@ -62,6 +62,39 @@ describe('getHRV', () => {
     ]);
   });
 
+  it('skips days that carry neither daily nor deep-sleep RMSSD', async () => {
+    // The wire contract allows points with only entropy / non-REM HR set;
+    // they would surface as `value: {}` days and skew RMSSD aggregates.
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            dataPoints: [
+              {
+                dailyHeartRateVariability: {
+                  date: { year: 2026, month: 7, day: 30 },
+                  entropy: 3.1,
+                  nonRemHeartRateBeatsPerMinute: '58',
+                },
+              },
+              {
+                dailyHeartRateVariability: {
+                  date: { year: 2026, month: 7, day: 31 },
+                  averageHeartRateVariabilityMilliseconds: 39,
+                },
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new GoogleHealthClient(envWithFreshToken());
+    const days = await getHRV(client, '2026-07-30', '2026-07-31');
+    expect(days.map((d) => d.dateTime)).toEqual(['2026-07-31']);
+  });
+
   it('sorts days ascending regardless of API order', async () => {
     const fetchMock = vi.fn(
       async () =>

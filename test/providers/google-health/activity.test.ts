@@ -172,6 +172,10 @@ describe('getDailySummary', () => {
         body = {
           rollupDataPoints: [rollupPoint(31, { sedentaryPeriod: { durationSum: '39600s' } })],
         };
+      } else if (p.includes('/dataTypes/altitude/')) {
+        body = {
+          rollupDataPoints: [rollupPoint(31, { altitude: { gainMillimetersSum: '12500' } })],
+        };
       } else if (p.includes('/dataTypes/active-minutes/')) {
         body = {
           rollupDataPoints: [
@@ -233,6 +237,7 @@ describe('getDailySummary', () => {
     expect(summary.summary.activityCalories).toBe(820);
     expect(summary.summary.distances).toEqual([{ activity: 'total', distance: 6.23 }]);
     expect(summary.summary.floors).toBe(12);
+    expect(summary.summary.elevation).toBe(12.5);
     expect(summary.summary.sedentaryMinutes).toBe(660);
     expect(summary.summary.lightlyActiveMinutes).toBe(210);
     expect(summary.summary.fairlyActiveMinutes).toBe(35);
@@ -260,6 +265,33 @@ describe('getDailySummary', () => {
 
     expect(summary.summary.steps).toBeUndefined();
     expect(summary.summary.distances).toBeUndefined();
+    expect(summary.summary.elevation).toBeUndefined();
     expect(summary.summary.heartRateZones).toBeUndefined();
+  });
+});
+
+describe('range guards', () => {
+  it('rejects ranges needing more rollup requests than the chunk budget', async () => {
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ rollupDataPoints: [] }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new GoogleHealthClient(envWithFreshToken());
+    // calories is capped at 14-day chunks; 281+ days exceeds the 20-chunk budget
+    await expect(
+      getActivityTimeSeries(client, 'calories', '2025-01-01', '2026-07-31'),
+    ).rejects.toThrow(/narrow the range/i);
+    // and nothing should have been fetched
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns an empty series when the API reports no data for the range', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({}), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new GoogleHealthClient(envWithFreshToken());
+    const series = await getActivityTimeSeries(client, 'steps', '2026-07-30', '2026-07-31');
+    expect(series.points).toEqual([]);
   });
 });

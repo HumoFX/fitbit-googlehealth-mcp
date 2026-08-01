@@ -84,6 +84,11 @@ export function chunkDateRange(
   return chunks;
 }
 
+// Upper bound on sequential rollup requests per tool call, so oversized
+// ranges fail fast with an actionable message instead of dying mid-loop on
+// the Workers subrequest budget (50/request on the free plan).
+const MAX_CHUNKS_PER_CALL = 20;
+
 /** `dailyRollUp` over ranges longer than the data type's cap, sequentially. */
 export async function dailyRollUpChunked(
   client: GoogleHealthClient,
@@ -92,8 +97,15 @@ export async function dailyRollUpChunked(
   endInclusive: string,
   maxDays: number,
 ): Promise<DailyRollupPoint[]> {
+  const chunks = chunkDateRange(start, endInclusive, maxDays);
+  if (chunks.length > MAX_CHUNKS_PER_CALL) {
+    throw new RangeError(
+      `Range ${start}..${endInclusive} needs ${chunks.length} ${dataType} rollup requests ` +
+        `(max ${MAX_CHUNKS_PER_CALL}, ≈${MAX_CHUNKS_PER_CALL * maxDays} days for this resource) — narrow the range.`,
+    );
+  }
   const all: DailyRollupPoint[] = [];
-  for (const chunk of chunkDateRange(start, endInclusive, maxDays)) {
+  for (const chunk of chunks) {
     all.push(...(await dailyRollUp(client, dataType, chunk.start, chunk.end)));
   }
   return all;

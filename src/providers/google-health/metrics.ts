@@ -52,6 +52,14 @@ export async function getHRV(
     .flatMap((point) => {
       const hrv = point.dailyHeartRateVariability;
       if (!hrv) return [];
+      // Points may legally carry only entropy / non-REM HR; without either
+      // RMSSD field they have no Fitbit-shaped value and would skew averages.
+      if (
+        hrv.averageHeartRateVariabilityMilliseconds === undefined &&
+        hrv.deepSleepRootMeanSquareOfSuccessiveDifferencesMilliseconds === undefined
+      ) {
+        return [];
+      }
       return [
         {
           dateTime: ghDateToIso(hrv.date),

@@ -113,7 +113,7 @@ function firstPoint(points: DailyRollupPoint[]): DailyRollupPoint | undefined {
 /**
  * Fitbit's single daily-summary endpoint has no one-shot Google Health
  * equivalent — the composite is assembled from per-type 1-day rollups plus
- * the daily heart-rate reads. ~10 requests per call, well within the
+ * the daily heart-rate reads. ~11 requests per call, well within the
  * 300 req/min/user quota; the tool layer caches the result for 1h.
  *
  * Not populated (no Google Health source): goals, caloriesBMR,
@@ -129,6 +129,7 @@ export async function getDailySummary(
     totalCalories,
     activeEnergy,
     floors,
+    altitude,
     activeMinutes,
     sedentary,
     rhrByDate,
@@ -140,6 +141,7 @@ export async function getDailySummary(
     dailyRollUp(client, 'total-calories', date, date),
     dailyRollUp(client, 'active-energy-burned', date, date),
     dailyRollUp(client, 'floors', date, date),
+    dailyRollUp(client, 'altitude', date, date),
     dailyRollUp(client, 'active-minutes', date, date),
     dailyRollUp(client, 'sedentary-period', date, date),
     fetchRestingHeartRate(client, date, date),
@@ -152,6 +154,7 @@ export async function getDailySummary(
   const caloriesPoint = firstPoint(totalCalories);
   const activeEnergyPoint = firstPoint(activeEnergy);
   const floorsPoint = firstPoint(floors);
+  const altitudePoint = firstPoint(altitude);
   const activeMinutesPoint = firstPoint(activeMinutes);
   const sedentaryPoint = firstPoint(sedentary);
 
@@ -174,6 +177,10 @@ export async function getDailySummary(
       distances:
         distanceKm !== undefined ? [{ activity: 'total', distance: distanceKm }] : undefined,
       floors: floorsPoint?.floors?.countSum,
+      elevation:
+        altitudePoint?.altitude?.gainMillimetersSum !== undefined
+          ? altitudePoint.altitude.gainMillimetersSum / 1000 // mm → m
+          : undefined,
       sedentaryMinutes:
         sedentaryPoint?.sedentaryPeriod?.durationSum !== undefined
           ? Math.round(durationToSeconds(sedentaryPoint.sedentaryPeriod.durationSum) / 60)

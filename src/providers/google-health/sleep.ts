@@ -4,9 +4,8 @@ import { type GoogleHealthClient, paginate } from './client';
 import {
   civilRangeFilter,
   civilToLocalIso,
-  durationToSeconds,
-  ghDateToIso,
   GhIntervalSchema,
+  ghDateToIso,
   int64,
   shiftToLocalIso,
 } from './wire';

@@ -167,7 +167,7 @@ export class FitbitProvider implements HealthProvider {
   deleteActivityLog(logId: number): Promise<void> {
     return deleteActivityLog(this.client, logId);
   }
-  deleteSleepLog(logId: number): Promise<void> {
+  deleteSleepLog(logId: number | string): Promise<void> {
     return deleteSleepLog(this.client, logId);
   }
 }

@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GoogleHealthClient } from '../../../src/providers/google-health/client';
-import { getSleep, getSleepRange } from '../../../src/providers/google-health/sleep';
+import {
+  getSleep,
+  getSleepRange,
+  mapGhSleepToSleepLog,
+} from '../../../src/providers/google-health/sleep';
 import { createMockEnv } from '../../helpers/mock-env';
 
 const fixture = JSON.parse(
@@ -123,6 +127,74 @@ describe('getSleepRange', () => {
     const logs = await getSleepRange(client, '2026-07-25', '2026-07-31');
     expect(logs).toHaveLength(2);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('mapGhSleepToSleepLog fallback paths', () => {
+  it('derives local times from UTC + offsets when civil times are absent', () => {
+    const log = mapGhSleepToSleepLog('users/me/dataTypes/sleep/dataPoints/x', {
+      interval: {
+        startTime: '2026-07-30T14:10:00Z',
+        endTime: '2026-07-30T21:40:00Z',
+        startUtcOffset: '32400s',
+        endUtcOffset: '32400s',
+      },
+      type: 'STAGES',
+    });
+
+    expect(log.startTime).toBe('2026-07-30T23:10:00.000');
+    expect(log.endTime).toBe('2026-07-31T06:40:00.000');
+    expect(log.dateOfSleep).toBe('2026-07-31');
+    expect(log.duration).toBe(27_000_000);
+    // no summary and no stages → minutesAsleep falls back to the duration
+    expect(log.minutesAsleep).toBe(450);
+  });
+
+  it('applies per-end offsets when the UTC offset changes mid-session (DST end)', () => {
+    const log = mapGhSleepToSleepLog(undefined, {
+      interval: {
+        startTime: '2026-11-01T03:00:00Z',
+        endTime: '2026-11-01T11:00:00Z',
+        startUtcOffset: '-14400s', // UTC-4 before the switch
+        endUtcOffset: '-18000s', // UTC-5 after the switch
+      },
+    });
+
+    expect(log.startTime).toBe('2026-10-31T23:00:00.000');
+    expect(log.endTime).toBe('2026-11-01T06:00:00.000');
+    expect(log.dateOfSleep).toBe('2026-11-01');
+    // duration stays physical: 8h regardless of the civil-time jump
+    expect(log.duration).toBe(8 * 3_600_000);
+  });
+
+  it("maps AWAKE to 'awake' (not 'wake') for CLASSIC sleeps", () => {
+    const log = mapGhSleepToSleepLog(undefined, {
+      interval: {
+        startTime: '2026-07-31T04:00:00Z',
+        endTime: '2026-07-31T05:00:00Z',
+        startUtcOffset: '32400s',
+        endUtcOffset: '32400s',
+      },
+      type: 'CLASSIC',
+      stages: [
+        {
+          startTime: '2026-07-31T04:00:00Z',
+          endTime: '2026-07-31T04:50:00Z',
+          startUtcOffset: '32400s',
+          endUtcOffset: '32400s',
+          type: 'ASLEEP',
+        },
+        {
+          startTime: '2026-07-31T04:50:00Z',
+          endTime: '2026-07-31T05:00:00Z',
+          startUtcOffset: '32400s',
+          endUtcOffset: '32400s',
+          type: 'AWAKE',
+        },
+      ],
+    });
+
+    expect(log.levels?.data?.map((d) => d.level)).toEqual(['asleep', 'awake']);
   });
 });
 

@@ -65,4 +65,18 @@ describe('provider-namespaced cache storage', () => {
     expect(second).toBe('fresh');
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+
+  it('stores entries with the default 1h TTL', async () => {
+    const env = createMockEnv();
+    await getCached(env, 'k', async () => 1);
+    const putCall = (env.CACHE as unknown as MockKv).put.mock.calls[0];
+    expect(putCall?.[2]).toEqual({ expirationTtl: 3600 });
+  });
+
+  it('honours a custom ttlSec', async () => {
+    const env = createMockEnv();
+    await getCached(env, 'k', async () => 1, { ttlSec: 60 });
+    const putCall = (env.CACHE as unknown as MockKv).put.mock.calls[0];
+    expect(putCall?.[2]).toEqual({ expirationTtl: 60 });
+  });
 });

@@ -254,6 +254,10 @@ async function main(): Promise<void> {
   console.log('Next: store these on Cloudflare Workers.');
   console.log('──────────────────────────────────────────');
   console.log('');
+  console.log('⚠ The commands below contain the RAW tokens (they are meant to be');
+  console.log('  copy-pasted). Clear your terminal scrollback and shell history');
+  console.log('  afterwards, and never paste them anywhere else.');
+  console.log('');
   console.log('1) Secrets (skip any that are already set):');
   console.log('   pnpm wrangler secret put GOOGLE_CLIENT_ID');
   console.log(`     ↳ value: ${clientId}`);

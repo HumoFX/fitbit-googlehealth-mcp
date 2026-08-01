@@ -433,5 +433,7 @@ export interface HealthProvider {
   deleteWeightLog(logId: number): Promise<void>;
   deleteBodyFatLog(logId: number): Promise<void>;
   deleteActivityLog(logId: number): Promise<void>;
-  deleteSleepLog(logId: number): Promise<void>;
+  // number for Fitbit logIds, string for Google Health resource names
+  // (matches the widened SleepLogSchema.logId).
+  deleteSleepLog(logId: number | string): Promise<void>;
 }

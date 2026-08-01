@@ -156,7 +156,7 @@ export class GoogleHealthProvider implements HealthProvider {
   async deleteActivityLog(_logId: number): Promise<void> {
     notImplemented('delete_activity_log');
   }
-  async deleteSleepLog(_logId: number): Promise<void> {
+  async deleteSleepLog(_logId: number | string): Promise<void> {
     notImplemented('delete_sleep_log');
   }
 }

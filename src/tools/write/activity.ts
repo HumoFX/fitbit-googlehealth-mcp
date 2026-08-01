@@ -5,7 +5,7 @@ import { cacheKey, invalidate } from '../../lib/cache';
 import { assertIsoDate, todayJst } from '../../lib/date';
 import { toolErrorResult } from '../../lib/errors';
 import type { HealthProvider } from '../../providers/types';
-import { ExerciseLogSchema } from '../../providers/types';
+import { ExerciseLogSchema, LogIdSchema } from '../../providers/types';
 
 const TIME_RE = /^\d{2}:\d{2}:\d{2}$/;
 
@@ -76,13 +76,13 @@ export function registerActivityWriteTool(
       description:
         'Remove a previously logged exercise by its logId (from log_activity output or from get_exercise_list[].logId).',
       inputSchema: {
-        logId: z.number().int().describe('Activity logId.'),
+        logId: LogIdSchema.describe('Activity logId.'),
         date: z
           .string()
           .describe('YYYY-MM-DD the entry was logged under. Used to invalidate caches.')
           .optional(),
       },
-      outputSchema: { deleted: z.boolean(), logId: z.number() },
+      outputSchema: { deleted: z.boolean(), logId: LogIdSchema },
     },
     async ({ logId, date }) => {
       try {

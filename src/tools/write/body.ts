@@ -5,7 +5,7 @@ import { cacheKey, invalidate } from '../../lib/cache';
 import { assertIsoDate, todayJst } from '../../lib/date';
 import { toolErrorResult } from '../../lib/errors';
 import type { HealthProvider } from '../../providers/types';
-import { BodyFatLogSchema, WeightLogSchema } from '../../providers/types';
+import { BodyFatLogSchema, LogIdSchema, WeightLogSchema } from '../../providers/types';
 
 const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/;
 
@@ -84,13 +84,13 @@ export function registerBodyWriteTools(
       description:
         'Remove a previously logged weight entry by its logId (from log_weight output or from get_body_log.weight[].logId). Use this to undo a mis-typed or test reading.',
       inputSchema: {
-        logId: z.number().int().describe('Weight logId.'),
+        logId: LogIdSchema.describe('Weight logId.'),
         date: z
           .string()
           .describe('YYYY-MM-DD the entry was logged under. Used to invalidate caches.')
           .optional(),
       },
-      outputSchema: { deleted: z.boolean(), logId: z.number() },
+      outputSchema: { deleted: z.boolean(), logId: LogIdSchema },
     },
     async ({ logId, date }) => {
       try {
@@ -115,9 +115,9 @@ export function registerBodyWriteTools(
       description:
         'Remove a previously logged body-fat entry by its logId (from log_body_fat output or from get_body_log.fat[].logId).',
       inputSchema: {
-        logId: z.number().int().describe('Body-fat logId.'),
+        logId: LogIdSchema.describe('Body-fat logId.'),
       },
-      outputSchema: { deleted: z.boolean(), logId: z.number() },
+      outputSchema: { deleted: z.boolean(), logId: LogIdSchema },
     },
     async ({ logId }) => {
       try {

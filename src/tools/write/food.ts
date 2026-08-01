@@ -7,6 +7,7 @@ import { toolErrorResult } from '../../lib/errors';
 import type { HealthProvider } from '../../providers/types';
 import {
   FoodLogEntrySchema,
+  LogIdSchema,
   MealType,
   NutritionalValuesSchema,
   WaterLogEntrySchema,
@@ -183,7 +184,7 @@ export function registerFoodWriteTools(
           )
           .optional(),
       },
-      outputSchema: { deleted: z.boolean(), logId: z.number() },
+      outputSchema: { deleted: z.boolean(), logId: LogIdSchema },
     },
     async ({ logId, date }) => {
       try {
@@ -208,13 +209,13 @@ export function registerFoodWriteTools(
       description:
         'Remove a previously logged water entry by its logId (from log_water output or from get_food_log.water.water[].logId).',
       inputSchema: {
-        logId: z.number().int().describe('Water logId.'),
+        logId: LogIdSchema.describe('Water logId.'),
         date: z
           .string()
           .describe('YYYY-MM-DD the entry was logged under. Used to invalidate caches.')
           .optional(),
       },
-      outputSchema: { deleted: z.boolean(), logId: z.number() },
+      outputSchema: { deleted: z.boolean(), logId: LogIdSchema },
     },
     async ({ logId, date }) => {
       try {

@@ -5,7 +5,7 @@ import { cacheKey, invalidate } from '../../lib/cache';
 import { assertIsoDate, todayJst } from '../../lib/date';
 import { toolErrorResult } from '../../lib/errors';
 import type { HealthProvider } from '../../providers/types';
-import { SleepLogSchema } from '../../providers/types';
+import { LogIdSchema, SleepLogSchema } from '../../providers/types';
 
 const TIME_RE = /^\d{2}:\d{2}$/;
 
@@ -62,13 +62,13 @@ export function registerSleepWriteTool(
       inputSchema: {
         // Fitbit logIds are numeric; Google Health sleep ids are resource-name
         // strings — accept both so the contract matches get_sleep[].logId.
-        logId: z.union([z.number().int(), z.string()]).describe('Sleep logId.'),
+        logId: LogIdSchema.describe('Sleep logId.'),
         date: z
           .string()
           .describe('YYYY-MM-DD the sleep was logged under. Used to invalidate caches.')
           .optional(),
       },
-      outputSchema: { deleted: z.boolean(), logId: z.union([z.number(), z.string()]) },
+      outputSchema: { deleted: z.boolean(), logId: LogIdSchema },
     },
     async ({ logId, date }) => {
       try {

@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import type { BodyFatLog, BodyLog, LogBodyFatInput, LogWeightInput, WeightLog } from '../types';
+import type {
+  BodyFatLog,
+  BodyLog,
+  LogBodyFatInput,
+  LogId,
+  LogWeightInput,
+  WeightLog,
+} from '../types';
 import { BodyFatLogSchema, WeightLogSchema } from '../types';
 import type { FitbitClient } from './client';
 
@@ -70,14 +77,14 @@ export async function logBodyFat(
   return response.fatLog;
 }
 
-export async function deleteWeightLog(client: FitbitClient, logId: number): Promise<void> {
+export async function deleteWeightLog(client: FitbitClient, logId: LogId): Promise<void> {
   await client.requestText({
     path: `/1/user/-/body/log/weight/${logId}.json`,
     method: 'DELETE',
   });
 }
 
-export async function deleteBodyFatLog(client: FitbitClient, logId: number): Promise<void> {
+export async function deleteBodyFatLog(client: FitbitClient, logId: LogId): Promise<void> {
   await client.requestText({
     path: `/1/user/-/body/log/fat/${logId}.json`,
     method: 'DELETE',

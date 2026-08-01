@@ -17,6 +17,7 @@ import type {
   LogActivityInput,
   LogBodyFatInput,
   LogFoodInput,
+  LogId,
   LogMealInput,
   LogSleepInput,
   LogWaterInput,
@@ -141,22 +142,22 @@ export class GoogleHealthProvider implements HealthProvider {
   async logSleep(_input: LogSleepInput): Promise<SleepLog> {
     notImplemented('log_sleep');
   }
-  async deleteFoodLog(_logId: number): Promise<void> {
+  async deleteFoodLog(_logId: LogId): Promise<void> {
     notImplemented('delete_food_log');
   }
-  async deleteWaterLog(_logId: number): Promise<void> {
+  async deleteWaterLog(_logId: LogId): Promise<void> {
     notImplemented('delete_water_log');
   }
-  async deleteWeightLog(_logId: number): Promise<void> {
+  async deleteWeightLog(_logId: LogId): Promise<void> {
     notImplemented('delete_weight_log');
   }
-  async deleteBodyFatLog(_logId: number): Promise<void> {
+  async deleteBodyFatLog(_logId: LogId): Promise<void> {
     notImplemented('delete_body_fat_log');
   }
-  async deleteActivityLog(_logId: number): Promise<void> {
+  async deleteActivityLog(_logId: LogId): Promise<void> {
     notImplemented('delete_activity_log');
   }
-  async deleteSleepLog(_logId: number | string): Promise<void> {
+  async deleteSleepLog(_logId: LogId): Promise<void> {
     notImplemented('delete_sleep_log');
   }
 }

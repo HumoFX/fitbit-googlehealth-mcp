@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+/**
+ * Log identifiers differ by backend: Fitbit issues numeric ids, Google
+ * Health identifies data points by resource-name strings
+ * (`users/me/dataTypes/{type}/dataPoints/{id}`). Tools accept either.
+ */
+export const LogIdSchema = z.union([z.number(), z.string()]);
+export type LogId = z.infer<typeof LogIdSchema>;
+
 // ---------- Profile ----------
 export const ProfileSchema = z.object({
   user: z.object({
@@ -112,7 +120,7 @@ export type TimeSeries = z.infer<typeof TimeSeriesSchema>;
 
 // ---------- Exercise log list ----------
 export const ExerciseLogSchema = z.object({
-  logId: z.number().optional(),
+  logId: LogIdSchema.optional(),
   activityName: z.string().optional(),
   activityTypeId: z.number().optional(),
   startTime: z.string().optional(),
@@ -163,7 +171,7 @@ export const SleepStageSchema = z.object({
 export const SleepLogSchema = z.object({
   // Fitbit issues numeric log ids; Google Health identifies data points by
   // resource-name strings (`users/me/dataTypes/sleep/dataPoints/{id}`).
-  logId: z.union([z.number(), z.string()]),
+  logId: LogIdSchema,
   dateOfSleep: z.string(),
   startTime: z.string(),
   endTime: z.string(),
@@ -188,7 +196,7 @@ export type SleepLog = z.infer<typeof SleepLogSchema>;
 
 // ---------- Body ----------
 export const WeightLogSchema = z.object({
-  logId: z.number().optional(),
+  logId: LogIdSchema.optional(),
   date: z.string(),
   time: z.string().optional(),
   weight: z.number(),
@@ -199,7 +207,7 @@ export const WeightLogSchema = z.object({
 export type WeightLog = z.infer<typeof WeightLogSchema>;
 
 export const BodyFatLogSchema = z.object({
-  logId: z.number().optional(),
+  logId: LogIdSchema.optional(),
   date: z.string(),
   time: z.string().optional(),
   fat: z.number(),
@@ -236,7 +244,7 @@ export const NutritionalValuesSchema = z.object({
 export type NutritionalValues = z.infer<typeof NutritionalValuesSchema>;
 
 export const FoodLogEntrySchema = z.object({
-  logId: z.number(),
+  logId: LogIdSchema,
   loggedFood: z
     .object({
       name: z.string().optional(),
@@ -255,7 +263,7 @@ export const FoodLogEntrySchema = z.object({
 export type FoodLogEntry = z.infer<typeof FoodLogEntrySchema>;
 
 export const WaterLogEntrySchema = z.object({
-  logId: z.number(),
+  logId: LogIdSchema,
   amount: z.number(),
 });
 export type WaterLogEntry = z.infer<typeof WaterLogEntrySchema>;
@@ -428,12 +436,10 @@ export interface HealthProvider {
   logBodyFat(input: LogBodyFatInput): Promise<BodyFatLog>;
   logActivity(input: LogActivityInput): Promise<ExerciseLog>;
   logSleep(input: LogSleepInput): Promise<SleepLog>;
-  deleteFoodLog(logId: number): Promise<void>;
-  deleteWaterLog(logId: number): Promise<void>;
-  deleteWeightLog(logId: number): Promise<void>;
-  deleteBodyFatLog(logId: number): Promise<void>;
-  deleteActivityLog(logId: number): Promise<void>;
-  // number for Fitbit logIds, string for Google Health resource names
-  // (matches the widened SleepLogSchema.logId).
-  deleteSleepLog(logId: number | string): Promise<void>;
+  deleteFoodLog(logId: LogId): Promise<void>;
+  deleteWaterLog(logId: LogId): Promise<void>;
+  deleteWeightLog(logId: LogId): Promise<void>;
+  deleteBodyFatLog(logId: LogId): Promise<void>;
+  deleteActivityLog(logId: LogId): Promise<void>;
+  deleteSleepLog(logId: LogId): Promise<void>;
 }

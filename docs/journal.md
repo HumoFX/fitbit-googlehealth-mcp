@@ -628,3 +628,40 @@ other.
 
 After the fixes: logged 250 ml of water and a 650 kcal meal with full
 macros, both accepted, both deleted again via `:batchDelete`.
+
+---
+
+## 2026-08-02 / The long tail: remaining reads
+
+Ten tools that were still answering "not implemented". Mostly mechanical
+against the Discovery doc, but three were not like-for-like:
+
+**Profile** — Fitbit served one document; Google splits it across
+`users/me/identity` (ids), `/profile` (age, membership start, stride
+lengths) and `/settings` (units, timezone). Each sub-request is optional,
+so a missing scope degrades the answer instead of failing it. What Google
+simply does not have: display name, date of birth, height, weight,
+average daily steps.
+
+**Devices** — the biggest loss of the whole migration relative to
+usefulness. `pairedDevices` returns name, form factor and manufacturer.
+No battery level, no last-sync time — which is essentially the only
+reason anyone called Fitbit's device list. Nothing to be done; documented
+in the README table.
+
+**Intraday heart rate** — the research note held up: there are no
+`detailLevel` buckets. The API returns native samples (~5s cadence) and
+the 1sec/1min/5min/15min resolution Fitbit callers ask for has to be
+produced client-side, so `downsample()` averages into fixed buckets.
+Fitbit's habit of pruning intraday points around logged workouts has no
+equivalent here — samples are simply what the device recorded.
+
+Also of note: `getExerciseList` cannot page by offset the way Fitbit's
+`beforeDate` + `limit` did, because the API filters rather than offsets.
+It now queries a 90-day civil window ending at `beforeDate` and slices
+locally, which is the same answer for any realistic `limit`.
+
+With this the provider implements every `HealthProvider` method, so the
+`notImplemented` escape hatch is deleted and a test asserts parity
+against the Fitbit provider's prototype — a stub reappearing would now
+fail the suite rather than surface as a runtime error on someone's phone.

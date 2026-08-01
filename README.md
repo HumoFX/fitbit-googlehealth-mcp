@@ -39,17 +39,26 @@ Google Health API v4 (`health.googleapis.com/v4`). Select the backend with
 the `HEALTH_PROVIDER` var in `wrangler.toml` (`fitbit` — default, full tool
 set — or `google_health`).
 
-Covered tools:
+All 16 read tools and all 13 write/delete tools now work under
+`google_health` — the provider is feature-complete against the Fitbit one.
 
-- **Reads**: `get_sleep`, `get_sleep_range`, `get_daily_summary`,
-  `get_activity_timeseries`, `get_heart_rate_range`, `get_hrv`
-- **Writes**: `log_food`, `log_meal_photo`, `log_water`, `log_weight`,
-  `log_body_fat`, `log_activity`, `log_sleep` and every matching delete
+Fields Google has no counterpart for, which stay absent rather than
+invented:
 
-Still returning a descriptive "not implemented" error under
-`google_health`: `get_profile`, `list_devices`, `get_exercise_list`,
-`get_heart_rate_intraday`, `get_body_log`, `get_food_log`, `get_spo2`,
-`get_respiratory_rate`, `get_skin_temperature`, `get_cardio_fitness`.
+| Area | Missing under Google Health |
+|---|---|
+| Profile | display name, date of birth, height, weight, average daily steps (Google returns age and stride lengths instead) |
+| Devices | battery level and last-sync time — Google exposes only name, form factor and manufacturer |
+| Daily summary | goals, `caloriesBMR`, `marginalCalories`, per-zone `caloriesOut` |
+| Sleep | `efficiency`, `infoCode` |
+| Breathing rate | the per-sleep-stage breakdown (Google keeps it in a separate data type) |
+| Activity series | the `caloriesBMR` resource |
+
+Semantics that differ rather than disappear: heart-rate zones are named
+Light/Moderate/Vigorous/Peak with Karvonen thresholds; skin temperature
+gains an absolute nightly reading and baseline next to the relative
+deviation; intraday heart rate has no server-side `detailLevel`, so
+native samples are averaged into the requested resolution client-side.
 
 Nutrition writes are the clearest win of the migration: Google takes
 macros as typed quantities and a nutrient enum, so none of the Fitbit-era

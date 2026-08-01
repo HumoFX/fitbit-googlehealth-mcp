@@ -99,10 +99,13 @@ export async function getActivityTimeSeries(
   const points = await dailyRollUpChunked(client, spec.dataType, start, end, spec.maxDays);
   return {
     resource,
-    points: points.map((p) => ({
-      dateTime: ghDateToIso(p.civilStartTime.date),
-      value: spec.extract(p),
-    })),
+    // The API returns rollup windows newest-first; Fitbit series are ascending.
+    points: points
+      .map((p) => ({
+        dateTime: ghDateToIso(p.civilStartTime.date),
+        value: spec.extract(p),
+      }))
+      .sort((a, b) => a.dateTime.localeCompare(b.dateTime)),
   };
 }
 

@@ -27,14 +27,16 @@ afterEach(() => {
 });
 
 describe('getActivityTimeSeries', () => {
-  it('maps steps dailyRollUp points to a TimeSeries', async () => {
+  it('maps steps dailyRollUp points to an ascending TimeSeries', async () => {
+    // The live API returns rollup points newest-first; Fitbit's time series
+    // are ascending, so the mapper must sort.
     const fetchMock = vi.fn(
       async () =>
         new Response(
           JSON.stringify({
             rollupDataPoints: [
-              rollupPoint(30, { steps: { countSum: '8421' } }),
               rollupPoint(31, { steps: { countSum: '9100' } }),
+              rollupPoint(30, { steps: { countSum: '8421' } }),
             ],
           }),
           { status: 200 },

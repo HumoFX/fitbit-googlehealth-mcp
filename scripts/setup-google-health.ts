@@ -48,6 +48,11 @@ const SCOPES = [
   'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
   'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
   'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
+  // Writes are a separate scope family; without these the log_* tools 403.
+  'https://www.googleapis.com/auth/googlehealth.nutrition.writeonly',
+  'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.writeonly',
+  'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.writeonly',
+  'https://www.googleapis.com/auth/googlehealth.sleep.writeonly',
 ];
 
 const TokenResponse = z.object({
@@ -182,7 +187,7 @@ async function main(): Promise<void> {
     console.error('     https://console.developers.google.com/apis/library/health.googleapis.com');
     console.error('  2. Create an OAuth client (type "Web application") with this redirect URI:');
     console.error(`     http://${CALLBACK_HOST}:${CALLBACK_PORT}${CALLBACK_PATH}`);
-    console.error('  3. Add the googlehealth scopes on the Data Access page.');
+    console.error('  3. Add the googlehealth read + write scopes on the Data Access page.');
     console.error('  4. Export the values:');
     console.error('     export GOOGLE_CLIENT_ID=...');
     console.error('     export GOOGLE_CLIENT_SECRET=...');

@@ -31,6 +31,20 @@ describe('GOOGLE_LOGIN_SCOPES', () => {
       'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
     );
   });
+
+  it('requests the write scopes the log_* tools need', () => {
+    // Google splits read and write; without these every write returns 403.
+    for (const suffix of [
+      'nutrition.writeonly',
+      'health_metrics_and_measurements.writeonly',
+      'activity_and_fitness.writeonly',
+      'sleep.writeonly',
+    ]) {
+      expect(GOOGLE_LOGIN_SCOPES).toContain(
+        `https://www.googleapis.com/auth/googlehealth.${suffix}`,
+      );
+    }
+  });
 });
 
 describe('buildGoogleAuthUrl', () => {

@@ -14,9 +14,17 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 export const GOOGLE_LOGIN_SCOPES = [
   'openid',
   'email',
+  // Reads
   'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
   'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
   'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
+  // Writes — Google splits read and write, so the log_* tools need their own
+  // scopes: nutrition covers food and hydration logs, health_metrics covers
+  // weight and body fat, activity_and_fitness covers exercise sessions.
+  'https://www.googleapis.com/auth/googlehealth.nutrition.writeonly',
+  'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.writeonly',
+  'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.writeonly',
+  'https://www.googleapis.com/auth/googlehealth.sleep.writeonly',
 ];
 
 export function buildGoogleAuthUrl(opts: {

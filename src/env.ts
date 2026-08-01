@@ -5,4 +5,9 @@ export type Env = {
   FITBIT_CLIENT_SECRET: string;
   MCP_SHARED_SECRET: string;
   ALLOWED_CIDRS: string;
+  /** Which HealthProvider backs the tools. Defaults to 'fitbit' when unset. */
+  HEALTH_PROVIDER?: 'fitbit' | 'google_health';
+  /** Google Cloud OAuth client for the Google Health API provider. */
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
 };

@@ -73,6 +73,47 @@ Notable mapping differences vs Fitbit (see commit history and
 - Rate limits are per-minute (300 req/min/user) instead of Fitbit's
   150 req/h; the 1h response cache is kept regardless.
 
+### Multi-user mode (2026-08)
+
+By default one deployment serves one person: the Google tokens in KV are
+yours, and anyone holding the secret URL would read *your* data. Binding an
+`OAUTH_KV` namespace instead turns the Worker into an OAuth 2.1
+authorization server, so any number of people can connect the *same* URL
+and each sees only their own health data.
+
+How it works: claude.ai registers itself dynamically (RFC 7591) and sends
+the user to `/authorize`; the Worker parks the request and redirects to
+Google; after consent the callback takes the stable user id from the
+id_token `sub` claim, stores that user's Google tokens under
+`gh_u_<sub>_*`, and completes the grant with the identity in the token's
+(encrypted) props. Every request then resolves its user from the access
+token, and both the KV token bundle and the response cache are scoped to
+that id.
+
+To enable it on a deployment:
+
+1. `wrangler kv namespace create OAUTH_KV`, add the binding to
+   `wrangler.toml` (see the commented block in `wrangler.toml.example`).
+2. Add `https://<worker>.<subdomain>.workers.dev/oauth/google/callback` to
+   the Google OAuth client's **Authorized redirect URIs**.
+3. `pnpm deploy`.
+
+Users then add the connector with the plain `/mcp` URL — **no secret**:
+
+```
+https://<worker>.<subdomain>.workers.dev/mcp
+```
+
+Notes:
+
+- The shared-secret route `/mcp/<SECRET>` keeps working alongside, so an
+  existing personal connector survives the upgrade untouched.
+- An unverified Google client is capped at **100 users**, and each user
+  sees an "app isn't verified" interstitial (Advanced → proceed). Going
+  past either needs Google's CASA review.
+- Users can revoke access any time at
+  [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
+
 ---
 
 ## 前提

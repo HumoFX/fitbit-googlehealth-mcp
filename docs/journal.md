@@ -492,3 +492,59 @@ series now sort ascending to match the Fitbit contract (heart/HRV
 mappers already sorted). Sleep-by-civil-end-date filtering confirmed
 working (a session ending 2026-08-01 correctly absent from the
 2026-07-31 query). Live-probe checklist item: done.
+
+---
+
+## 2026-08-02 / Multi-user OAuth (Pattern A)
+
+The single-user design (Pattern B: CLI-seeded tokens + shared-secret URL)
+did its job, but sharing the server with a friend meant handing over a URL
+that reads *my* data. So: Pattern A, the option `research.md §11` had
+parked as "2-3× the work". It was closer to 1× — most of the cost was
+elsewhere than expected.
+
+### Recon corrections
+
+- `@cloudflare/workers-oauth-provider` is alive (0.8.3, published three
+  days before this entry) and needs only a `OAUTH_KV` binding — **no
+  Durable Objects**, so the free plan is fine. The DO requirement people
+  associate with remote MCP comes from `McpAgent` in the demos, not from
+  the OAuth library; `@hono/mcp` as the api handler avoids it.
+- Props are AES-GCM encrypted with key material wrapped by each token, and
+  are **not** immutable: `tokenExchangeCallback` can return `newProps` to
+  replace them at refresh time. That is the sanctioned way to keep upstream
+  tokens in props.
+- I still keep Google tokens in KV under `gh_u_<sub>_*` rather than props:
+  it reuses the already-tested refresh machinery (single-flight, skew,
+  401-invalidate) unchanged, and keeps one storage model for both modes.
+  The tradeoff is honest — props would be encrypted at rest, KV is not,
+  same as the single-user bundle has always been.
+- DCR is only SHOULD in the MCP spec, but it is claude.ai's default path,
+  so `clientRegistrationEndpoint` is effectively required for a
+  zero-friction connect.
+
+### The bug worth naming
+
+Yesterday's per-isolate token memory — a module-level singleton — would
+have served **one user's access token to another** the moment two people
+shared an isolate. Multi-user turned a harmless optimization into a
+cross-account data leak. Same shape for the response cache: keys were
+namespaced by provider but not by user. Both are now keyed per user, with
+tests that fail if the isolation regresses (`gh_u_*` reads, `u:<id>:`
+cache segments).
+
+### Verified in production
+
+Deployed, then: AS/PRM metadata served, DCR issues client ids, unauthorized
+`/mcp` answers 401 with a `WWW-Authenticate` pointing at the resource
+metadata, `plain` PKCE refused (S256 only), bare `/authorize` answers 400
+instead of a stack trace. Then the real test — added the connector in
+claude.ai with the secret-less `/mcp` URL, went through Google consent, and
+called `get_daily_summary` through it: real data, matching the single-user
+connector's numbers for the same day. KV showed exactly what it should:
+a `gh_u_<sub>_*` bundle, a `grant:<sub>:…`, and an issued token.
+
+### Known limits
+
+Unverified Google client: 100-user cap and an "app isn't verified"
+interstitial per user. Fine for friends; a public release needs CASA.

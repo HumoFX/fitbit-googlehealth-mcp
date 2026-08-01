@@ -548,3 +548,60 @@ a `gh_u_<sub>_*` bundle, a `grant:<sub>:…`, and an issued token.
 
 Unverified Google client: 100-user cap and an "app isn't verified"
 interstitial per user. Fine for friends; a public release needs CASA.
+
+---
+
+## 2026-08-02 / Write layer
+
+The last big gap: under `google_health` every `log_*` tool answered "not
+implemented", which meant the photo-driven food logging — the whole point
+of the original project — didn't work on the new provider.
+
+### What the API gives us
+
+`create` and `:batchDelete` both return a long-running `Operation`, not
+the resource. In practice they complete inline (`done: true`) with the
+created DataPoint in `operation.response`, and that response's `name` is
+the only way to learn the id needed for a later delete. So `createDataPoint`
+unwraps the operation three ways: success → resource name, `error` → raise
+the API message, `done: false` → say so rather than fabricate an id.
+
+### Nutrition: the workaround graveyard
+
+The 2026-04 entry catalogued what Fitbit demanded — `unitId: 304` on every
+foodName log, asymmetric nutrient keys discovered by brute force
+(`protein` but `totalFat`, `totalCarbohydrate`, `dietaryFiber`), Create
+Food silently dropping macros, and a whole server-side preset mechanism
+built to work around that. None of it survives. Google takes
+`energy`/`totalCarbohydrate`/`totalFat` as typed quantities and everything
+else as `{nutrient: 'PROTEIN', quantity: {grams}}` against a documented
+enum. The `research.md` prediction that migration would "clean up food
+logging" was the one user-visible win it promised, and it holds.
+
+Meal types map exactly, which I did not expect: Google documents
+`BEFORE_LUNCH` as "a morning snack" and `BEFORE_DINNER` as "an afternoon
+snack" — precisely Fitbit's two snack slots, no collapsing into generic
+`SNACK`.
+
+### Friction worth recording
+
+- `Exercise.metricsSummary` is a *required* field whose every inner
+  property is optional, so a manual activity log sends `{caloriesKcal,
+  distanceMillimeters}` and satisfies it.
+- `ExerciseType` is a 182-member enum. Mapping a free-text activity name
+  onto it exactly is a fool's errand, so common names map and everything
+  else falls back to `WORKOUT` with the user's wording kept as
+  `displayName`.
+- Anonymous-food nutrition logs are documented as not editable. Delete +
+  re-log is the only correction path; that is what the tools already do.
+- Log ids finally forced the issue: Fitbit's numeric ids and Google's
+  resource names now share one `LogId` union, and the delete tools' input
+  schemas — which had quietly disagreed with what the read tools return —
+  agree again.
+
+### Scopes
+
+Google splits read and write into separate families, so the new tools
+would 403 against any grant issued before today. Both consent flows now
+request the four `*.writeonly` scopes; existing grants must reconnect,
+which `prompt=consent` already forces.

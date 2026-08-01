@@ -39,9 +39,24 @@ Google Health API v4 (`health.googleapis.com/v4`). Select the backend with
 the `HEALTH_PROVIDER` var in `wrangler.toml` (`fitbit` — default, full tool
 set — or `google_health`).
 
-Covered tools: `get_sleep`, `get_sleep_range`, `get_daily_summary`,
-`get_activity_timeseries`, `get_heart_rate_range`, `get_hrv`. All other
-tools return a descriptive "not implemented" error under `google_health`.
+Covered tools:
+
+- **Reads**: `get_sleep`, `get_sleep_range`, `get_daily_summary`,
+  `get_activity_timeseries`, `get_heart_rate_range`, `get_hrv`
+- **Writes**: `log_food`, `log_meal_photo`, `log_water`, `log_weight`,
+  `log_body_fat`, `log_activity`, `log_sleep` and every matching delete
+
+Still returning a descriptive "not implemented" error under
+`google_health`: `get_profile`, `list_devices`, `get_exercise_list`,
+`get_heart_rate_intraday`, `get_body_log`, `get_food_log`, `get_spo2`,
+`get_respiratory_rate`, `get_skin_temperature`, `get_cardio_fitness`.
+
+Nutrition writes are the clearest win of the migration: Google takes
+macros as typed quantities and a nutrient enum, so none of the Fitbit-era
+workarounds survive — no mandatory `unitId: 304`, no asymmetric key names
+(`totalFat` but plain `protein`), and no server-side meal presets needed
+to stop macros being silently dropped. The preset tools remain for Fitbit
+deployments only.
 
 Setup:
 
@@ -54,6 +69,9 @@ Setup:
    `pnpm run setup:google-health`, then copy-paste the printed
    `wrangler secret put` / `wrangler kv key put` commands (`gh_*` keys —
    Fitbit tokens stay untouched, both providers can coexist).
+   **A grant issued before the write layer landed only carries the read
+   scopes**, so every `log_*` call will fail with 403 until you run the
+   setup again (or, in multi-user mode, reconnect the connector).
 3. Set `HEALTH_PROVIDER = "google_health"` and `pnpm deploy`.
 
 Notable mapping differences vs Fitbit (see commit history and

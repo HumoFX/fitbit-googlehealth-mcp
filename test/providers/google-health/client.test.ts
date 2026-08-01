@@ -177,15 +177,37 @@ describe('paginate', () => {
       return page;
     });
 
-    const all = await paginate(fetchPage);
-    expect(all).toEqual([1, 2, 3, 4]);
+    const result = await paginate(fetchPage);
+    expect(result.items).toEqual([1, 2, 3, 4]);
+    expect(result.truncated).toBe(false);
     expect(fetchPage).toHaveBeenCalledTimes(3);
   });
 
-  it('stops after maxPages to avoid unbounded loops', async () => {
+  it('stops after maxPages and reports the truncation', async () => {
     const fetchPage = vi.fn(async () => ({ items: [1], nextPageToken: 'again' }));
-    const all = await paginate(fetchPage, { maxPages: 3 });
-    expect(all).toEqual([1, 1, 1]);
+    const result = await paginate(fetchPage, { maxPages: 3 });
+    expect(result.items).toEqual([1, 1, 1]);
+    expect(result.truncated).toBe(true);
     expect(fetchPage).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('non-JSON success responses', () => {
+  it('wraps a non-JSON 200 body in GoogleHealthApiError with endpoint context', async () => {
+    const fetchMock = vi.fn(async () => new Response('<html>maintenance</html>', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new GoogleHealthClient(envWithFreshToken());
+    const err = await client
+      .requestJson(z.object({}), { path: '/users/me/dataTypes/steps/dataPoints' })
+      .then(
+        () => {
+          throw new Error('expected rejection');
+        },
+        (e: unknown) => e,
+      );
+    expect(err).toBeInstanceOf(GoogleHealthApiError);
+    expect((err as GoogleHealthApiError).message).toMatch(/steps/);
+    expect((err as GoogleHealthApiError).bodyText).toMatch(/maintenance/);
   });
 });

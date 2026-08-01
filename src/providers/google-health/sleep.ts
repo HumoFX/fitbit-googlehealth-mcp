@@ -149,13 +149,18 @@ export async function getSleepRange(
   end: string,
 ): Promise<SleepLog[]> {
   const filter = civilRangeFilter('sleep.interval.civil_end_time', start, end);
-  const dataPoints = await paginate(async (pageToken) => {
+  const { items: dataPoints, truncated } = await paginate(async (pageToken) => {
     const response = await client.requestJson(SleepReconcileResponseSchema, {
       path: '/users/me/dataTypes/sleep/dataPoints:reconcile',
       query: { filter, pageSize: SLEEP_PAGE_SIZE, pageToken },
     });
     return { items: response.dataPoints ?? [], nextPageToken: response.nextPageToken };
   });
+  if (truncated) {
+    throw new RangeError(
+      `Sleep query ${start}..${end} matched more than ${dataPoints.length} sessions and was cut off — narrow the date range.`,
+    );
+  }
 
   return dataPoints
     .filter((dp) => dp.sleep !== undefined)

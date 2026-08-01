@@ -35,13 +35,18 @@ export async function getHRV(
   end: string,
 ): Promise<HrvDay[]> {
   const filter = civilRangeFilter('daily_heart_rate_variability.date', start, end);
-  const points = await paginate(async (pageToken) => {
+  const { items: points, truncated } = await paginate(async (pageToken) => {
     const response = await client.requestJson(HrvListResponseSchema, {
       path: '/users/me/dataTypes/daily-heart-rate-variability/dataPoints',
       query: { filter, pageToken },
     });
     return { items: response.dataPoints ?? [], nextPageToken: response.nextPageToken };
   });
+  if (truncated) {
+    throw new RangeError(
+      `HRV query ${start}..${end} was cut off by pagination — narrow the date range.`,
+    );
+  }
 
   return points
     .flatMap((point) => {

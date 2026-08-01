@@ -58,13 +58,18 @@ async function fetchRestingHeartRate(
   end: string,
 ): Promise<Map<string, number>> {
   const filter = civilRangeFilter('daily_resting_heart_rate.date', start, end);
-  const points = await paginate(async (pageToken) => {
+  const { items: points, truncated } = await paginate(async (pageToken) => {
     const response = await client.requestJson(RhrListResponseSchema, {
       path: '/users/me/dataTypes/daily-resting-heart-rate/dataPoints',
       query: { filter, pageToken },
     });
     return { items: response.dataPoints ?? [], nextPageToken: response.nextPageToken };
   });
+  if (truncated) {
+    throw new RangeError(
+      `Resting-heart-rate query ${start}..${end} was cut off by pagination — narrow the date range.`,
+    );
+  }
 
   const byDate = new Map<string, number>();
   for (const point of points) {
@@ -80,13 +85,18 @@ async function fetchZoneThresholds(
   end: string,
 ): Promise<Map<string, ZoneThresholds[]>> {
   const filter = civilRangeFilter('daily_heart_rate_zones.date', start, end);
-  const points = await paginate(async (pageToken) => {
+  const { items: points, truncated } = await paginate(async (pageToken) => {
     const response = await client.requestJson(ZonesListResponseSchema, {
       path: '/users/me/dataTypes/daily-heart-rate-zones/dataPoints',
       query: { filter, pageToken },
     });
     return { items: response.dataPoints ?? [], nextPageToken: response.nextPageToken };
   });
+  if (truncated) {
+    throw new RangeError(
+      `Heart-rate-zones query ${start}..${end} was cut off by pagination — narrow the date range.`,
+    );
+  }
 
   const byDate = new Map<string, ZoneThresholds[]>();
   for (const point of points) {

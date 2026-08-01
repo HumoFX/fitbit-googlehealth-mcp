@@ -90,6 +90,22 @@ describe('getSleepRange', () => {
     expect(nap.levels?.data?.[0]?.level).toBe('asleep');
   });
 
+  it('throws instead of silently returning a truncated result when pages exceed the cap', async () => {
+    // Sleep pages are hard-capped at 25 items; paginate stops at 20 pages.
+    // An always-present nextPageToken must surface as an error, not as a
+    // silently incomplete (and then cached) result.
+    const fetchMock = vi.fn(async () => {
+      const body = { dataPoints: [fixture.dataPoints[0]], nextPageToken: 'more' };
+      return new Response(JSON.stringify(body), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new GoogleHealthClient(envWithFreshToken());
+    await expect(getSleepRange(client, '2020-01-01', '2026-07-31')).rejects.toThrow(
+      /narrow the date range/i,
+    );
+  });
+
   it('follows nextPageToken across reconcile pages', async () => {
     const page1 = {
       dataPoints: [fixture.dataPoints[0]],

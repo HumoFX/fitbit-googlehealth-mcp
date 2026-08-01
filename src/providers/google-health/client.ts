@@ -21,7 +21,18 @@ export class GoogleHealthClient {
 
   async requestJson<T>(schema: ZodType<T>, req: GoogleHealthRequest): Promise<T> {
     const body = await this.requestText(req);
-    const parsed = schema.safeParse(JSON.parse(body));
+    let json: unknown;
+    try {
+      json = JSON.parse(body);
+    } catch {
+      const rawPreview = body.length > 300 ? `${body.slice(0, 300)}…` : body;
+      throw new GoogleHealthApiError(
+        200,
+        `Non-JSON response at ${req.path}: ${rawPreview}`,
+        req.path,
+      );
+    }
+    const parsed = schema.safeParse(json);
     if (!parsed.success) {
       // Include a slice of the raw body so schema mismatches are diagnosable
       // from the MCP tool error alone (mirrors FitbitClient behaviour).
@@ -102,20 +113,24 @@ export class GoogleHealthClient {
 /**
  * Follow `nextPageToken` pagination until exhausted, concatenating page items.
  * `maxPages` bounds the loop — sleep/exercise pages are capped at 25 items by
- * the API, so long ranges can span many pages.
+ * the API, so long ranges can span many pages. When the bound is hit while a
+ * nextPageToken is still pending, `truncated` is true; callers must surface
+ * that instead of returning (and caching) a silently incomplete result.
  */
 export async function paginate<T>(
   fetchPage: (pageToken?: string) => Promise<{ items: T[]; nextPageToken?: string }>,
   opts: { maxPages?: number } = {},
-): Promise<T[]> {
+): Promise<{ items: T[]; truncated: boolean }> {
   const maxPages = opts.maxPages ?? 20;
   const all: T[] = [];
   let pageToken: string | undefined;
   for (let page = 0; page < maxPages; page++) {
     const { items, nextPageToken } = await fetchPage(pageToken);
     all.push(...items);
-    if (!nextPageToken) break;
+    if (!nextPageToken) {
+      return { items: all, truncated: false };
+    }
     pageToken = nextPageToken;
   }
-  return all;
+  return { items: all, truncated: true };
 }

@@ -477,3 +477,18 @@ per-zone `caloriesOut`; numeric `logId` (now resource-name strings —
   list) and the write side (`create` returns a long-running Operation —
   different contract than Fitbit's synchronous echo).
 - Fitbit-flavoured wording in a few non-MVP tool descriptions.
+
+### 2026-08-01, addendum: live probe passed
+
+Enabled the API in a real Cloud project, ran `setup:google-health`
+(hiccups: a stale callback listener on 8788 from an earlier attempt, and
+the consent screen still in Testing → 403 access_denied until published),
+loaded gh_* tokens into local KV, and exercised all six MVP tools through
+`wrangler dev` against health.googleapis.com. All six returned real data
+with zero schema-validation errors — the Discovery-doc-derived zod wire
+schemas held up. One behavioural fix out of the probe: the API returns
+rollup windows and reconcile results newest-first, so activity time
+series now sort ascending to match the Fitbit contract (heart/HRV
+mappers already sorted). Sleep-by-civil-end-date filtering confirmed
+working (a session ending 2026-08-01 correctly absent from the
+2026-07-31 query). Live-probe checklist item: done.

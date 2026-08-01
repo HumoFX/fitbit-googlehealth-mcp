@@ -4,7 +4,11 @@ import type { Env } from '../../src/env';
 export function createMockKv(init: Record<string, string> = {}) {
   const store = new Map(Object.entries(init));
   const kv = {
-    get: vi.fn(async (key: string, _type?: 'json' | 'text') => store.get(key) ?? null),
+    get: vi.fn(async (key: string, type?: 'json' | 'text') => {
+      const value = store.get(key);
+      if (value === undefined) return null;
+      return type === 'json' ? JSON.parse(value) : value;
+    }),
     put: vi.fn(async (key: string, value: string, _opts?: unknown) => {
       store.set(key, value);
     }),

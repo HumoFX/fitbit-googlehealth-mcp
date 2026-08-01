@@ -7,6 +7,10 @@ compatibility_flags = ["nodejs_compat"]
 # Anthropic's published outbound CIDR for Claude → MCP server connections.
 ALLOWED_CIDRS = "160.79.104.0/21"
 
+# Which backend serves the tools: "fitbit" (default, full tool set) or
+# "google_health" (read MVP; requires GOOGLE_* secrets and gh_* tokens).
+HEALTH_PROVIDER = "fitbit"
+
 # Create both KV namespaces before `wrangler deploy`:
 #   wrangler kv:namespace create TOKENS
 #   wrangler kv:namespace create CACHE
@@ -24,3 +28,7 @@ id = "<your-cache-namespace-id>"
 #   wrangler secret put FITBIT_CLIENT_ID
 #   wrangler secret put FITBIT_CLIENT_SECRET
 #   wrangler secret put MCP_SHARED_SECRET   # `openssl rand -base64 32`
+#
+# For HEALTH_PROVIDER = "google_health" (Google Cloud OAuth client):
+#   wrangler secret put GOOGLE_CLIENT_ID
+#   wrangler secret put GOOGLE_CLIENT_SECRET

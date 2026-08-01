@@ -2,25 +2,35 @@ import type { Env } from '../env';
 
 export const DEFAULT_CACHE_TTL_SEC = 60 * 60; // 1 hour
 
+/**
+ * KV keys are namespaced by the active provider so switching
+ * HEALTH_PROVIDER never serves cached data from the other backend
+ * (shapes match, but ids and metric semantics differ).
+ */
+function namespacedKey(env: Env, key: string): string {
+  return `${env.HEALTH_PROVIDER === 'google_health' ? 'google_health' : 'fitbit'}:${key}`;
+}
+
 export async function getCached<T>(
   env: Env,
   key: string,
   fetcher: () => Promise<T>,
   opts: { ttlSec?: number } = {},
 ): Promise<T> {
-  const hit = await env.CACHE.get(key, 'json');
+  const nsKey = namespacedKey(env, key);
+  const hit = await env.CACHE.get(nsKey, 'json');
   if (hit !== null && hit !== undefined) {
     return hit as T;
   }
   const fresh = await fetcher();
-  await env.CACHE.put(key, JSON.stringify(fresh), {
+  await env.CACHE.put(nsKey, JSON.stringify(fresh), {
     expirationTtl: opts.ttlSec ?? DEFAULT_CACHE_TTL_SEC,
   });
   return fresh;
 }
 
 export async function invalidate(env: Env, ...keys: string[]): Promise<void> {
-  await Promise.all(keys.map((k) => env.CACHE.delete(k)));
+  await Promise.all(keys.map((k) => env.CACHE.delete(namespacedKey(env, k))));
 }
 
 /** Build a stable cache key from endpoint path + ordered args. */

@@ -32,15 +32,19 @@ describe('GoogleHealthProvider', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/dataTypes/sleep/');
   });
 
-  it('rejects the reads that are not ported yet with a clear error', async () => {
+  it('implements every HealthProvider method', () => {
+    // The Fitbit provider is the reference surface; any method it has that
+    // Google Health lacks would silently fall off the tool list.
     const provider = new GoogleHealthProvider(envWithFreshToken());
-    await expect(provider.getFoodLog('2026-07-31')).rejects.toThrow(
-      /not implemented|not supported/i,
+    const reference = new FitbitProvider(createMockEnv());
+    const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(reference)).filter(
+      (name) => name !== 'constructor',
     );
-    await expect(provider.getBodyLog('2026-07-01', '2026-07-31')).rejects.toThrow(/google_health/);
-    await expect(provider.getHeartRateIntraday('2026-07-31', '1min')).rejects.toThrow(
-      /HEALTH_PROVIDER=fitbit/,
-    );
+
+    expect(methods.length).toBeGreaterThan(20);
+    for (const method of methods) {
+      expect(typeof (provider as unknown as Record<string, unknown>)[method]).toBe('function');
+    }
   });
 });
 

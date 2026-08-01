@@ -149,6 +149,7 @@ export type HeartRateDay = z.infer<typeof HeartRateDaySchema>;
 export const IntradayDetailLevel = z.enum(['1sec', '1min', '5min', '15min']);
 export type IntradayDetailLevelT = z.infer<typeof IntradayDetailLevel>;
 
+export type HeartRateIntradayPoint = { time: string; value: number };
 export const HeartRateIntradayPointSchema = z.object({
   time: z.string(),
   value: z.number(),

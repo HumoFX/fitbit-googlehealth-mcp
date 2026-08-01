@@ -33,7 +33,7 @@ import type {
 } from '../types';
 import { getActivityTimeSeries, getDailySummary } from './activity';
 import { GoogleHealthClient } from './client';
-import { getHeartRateRange } from './heart';
+import { getHeartRateIntraday, getHeartRateRange } from './heart';
 import {
   getCardioFitness,
   getHRV,
@@ -42,6 +42,7 @@ import {
   getSpO2,
 } from './metrics';
 import { getProfile, listDevices } from './profile';
+import { getBodyLog, getExerciseList, getFoodLog } from './reads';
 import { getSleep, getSleepRange } from './sleep';
 import {
   deleteByType,
@@ -54,24 +55,11 @@ import {
   logWeight,
 } from './write-domains';
 
-const SUPPORTED =
-  'reads: get_sleep, get_sleep_range, get_daily_summary, get_activity_timeseries, ' +
-  'get_heart_rate_range, get_hrv; writes: log_food, log_meal_photo, log_water, log_weight, ' +
-  'log_body_fat, log_activity, log_sleep and the matching deletes';
-
-function notImplemented(method: string): never {
-  throw new Error(
-    `${method} is not implemented by the google_health provider yet ` +
-      `(supported: ${SUPPORTED}). ` +
-      'Set HEALTH_PROVIDER=fitbit for full coverage until the Fitbit Web API turndown (September 2026).',
-  );
-}
-
 /**
- * GoogleHealthProvider — implements the MVP read slice of HealthProvider
- * against the Google Health API v4 (health.googleapis.com), the successor
- * of the Fitbit Web API. Remaining methods throw a descriptive error until
- * they are ported.
+ * GoogleHealthProvider — implements HealthProvider against the Google
+ * Health API v4 (health.googleapis.com), the successor of the Fitbit Web
+ * API. Feature-complete against the Fitbit provider's surface; see the
+ * README for the handful of fields Google has no counterpart for.
  */
 export class GoogleHealthProvider implements HealthProvider {
   private readonly client: GoogleHealthClient;
@@ -111,20 +99,20 @@ export class GoogleHealthProvider implements HealthProvider {
   listDevices(): Promise<Device[]> {
     return listDevices(this.client);
   }
-  async getExerciseList(_opts: { beforeDate?: string; limit?: number }): Promise<ExerciseLog[]> {
-    notImplemented('get_exercise_list');
+  getExerciseList(opts: { beforeDate?: string; limit?: number }): Promise<ExerciseLog[]> {
+    return getExerciseList(this.client, opts);
   }
-  async getHeartRateIntraday(
-    _date: string,
-    _detailLevel: IntradayDetailLevelT,
+  getHeartRateIntraday(
+    date: string,
+    detailLevel: IntradayDetailLevelT,
   ): Promise<HeartRateIntraday> {
-    notImplemented('get_heart_rate_intraday');
+    return getHeartRateIntraday(this.client, date, detailLevel);
   }
-  async getBodyLog(_start: string, _end: string): Promise<BodyLog> {
-    notImplemented('get_body_log');
+  getBodyLog(start: string, end: string): Promise<BodyLog> {
+    return getBodyLog(this.client, start, end);
   }
-  async getFoodLog(_date: string): Promise<FoodLog> {
-    notImplemented('get_food_log');
+  getFoodLog(date: string): Promise<FoodLog> {
+    return getFoodLog(this.client, date);
   }
   getSpO2(start: string, end: string): Promise<SpO2Day[]> {
     return getSpO2(this.client, start, end);

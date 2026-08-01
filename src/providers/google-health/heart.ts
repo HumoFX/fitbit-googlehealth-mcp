@@ -1,8 +1,21 @@
 import { z } from 'zod';
-import type { HeartRateDay, HeartRateZone } from '../types';
+import type {
+  HeartRateDay,
+  HeartRateIntraday,
+  HeartRateIntradayPoint,
+  HeartRateZone,
+  IntradayDetailLevelT,
+} from '../types';
 import { type GoogleHealthClient, paginate } from './client';
 import { chunkDateRange, DailyRollupPointSchema, dailyRollUp } from './rollup';
-import { civilRangeFilter, durationToSeconds, GhDateSchema, ghDateToIso, int64 } from './wire';
+import {
+  civilRangeFilter,
+  durationToSeconds,
+  GhDateSchema,
+  ghDateToIso,
+  int64,
+  shiftToLocalIso,
+} from './wire';
 
 const ZONE_ORDER = ['LIGHT', 'MODERATE', 'VIGOROUS', 'PEAK'] as const;
 const ZONE_NAMES: Record<string, string> = {
@@ -204,3 +217,111 @@ export {
   fetchTimeInZoneMinutes,
   fetchZoneThresholds,
 };
+
+const BUCKET_SECONDS: Record<IntradayDetailLevelT, number> = {
+  '1sec': 1,
+  '1min': 60,
+  '5min': 300,
+  '15min': 900,
+};
+
+function timeToSeconds(time: string): number {
+  const [h, m, s] = time.split(':').map(Number);
+  return (h ?? 0) * 3600 + (m ?? 0) * 60 + (s ?? 0);
+}
+
+function secondsToTime(total: number): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`;
+}
+
+/**
+ * Average native samples into fixed buckets. The API has no detailLevel
+ * parameter — it returns roughly one sample every few seconds — so the
+ * resolution Fitbit callers ask for is produced client-side.
+ */
+export function downsample(
+  points: HeartRateIntradayPoint[],
+  detailLevel: IntradayDetailLevelT,
+): HeartRateIntradayPoint[] {
+  const bucket = BUCKET_SECONDS[detailLevel];
+  if (bucket <= 1) return points;
+
+  const sums = new Map<number, { sum: number; count: number }>();
+  for (const point of points) {
+    const slot = Math.floor(timeToSeconds(point.time) / bucket) * bucket;
+    const acc = sums.get(slot) ?? { sum: 0, count: 0 };
+    acc.sum += point.value;
+    acc.count += 1;
+    sums.set(slot, acc);
+  }
+
+  return [...sums.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([slot, acc]) => ({ time: secondsToTime(slot), value: Math.round(acc.sum / acc.count) }));
+}
+
+const HeartRateListResponseSchema = z.object({
+  dataPoints: z
+    .array(
+      z.object({
+        heartRate: z
+          .object({
+            sampleTime: z.object({
+              physicalTime: z.string(),
+              utcOffset: z.string().optional(),
+            }),
+            beatsPerMinute: int64,
+          })
+          .optional(),
+      }),
+    )
+    .optional(),
+  nextPageToken: z.string().optional(),
+});
+
+/**
+ * All-day heart rate for one civil date. Resting HR and the zone summary
+ * come from the daily types, which stay populated even when the sample
+ * stream is sparse.
+ */
+export async function getHeartRateIntraday(
+  client: GoogleHealthClient,
+  date: string,
+  detailLevel: IntradayDetailLevelT,
+): Promise<HeartRateIntraday> {
+  const filter = civilRangeFilter('heart_rate.sample_time.civil_time', date, date);
+  const [samples, rhrByDate, zonesByDate, minutesByDate] = await Promise.all([
+    paginate(async (pageToken) => {
+      const response = await client.requestJson(HeartRateListResponseSchema, {
+        path: '/users/me/dataTypes/heart-rate/dataPoints',
+        query: { filter, pageSize: 10000, pageToken },
+      });
+      return { items: response.dataPoints ?? [], nextPageToken: response.nextPageToken };
+    }),
+    fetchRestingHeartRate(client, date, date),
+    fetchZoneThresholds(client, date, date),
+    fetchTimeInZoneMinutes(client, date, date),
+  ]);
+
+  const points = samples.items
+    .flatMap((point) => {
+      const hr = point.heartRate;
+      if (!hr) return [];
+      return [
+        {
+          time: shiftToLocalIso(hr.sampleTime.physicalTime, hr.sampleTime.utcOffset).slice(11, 19),
+          value: hr.beatsPerMinute,
+        },
+      ];
+    })
+    .sort((a, b) => a.time.localeCompare(b.time));
+
+  return {
+    date,
+    detailLevel,
+    restingHeartRate: rhrByDate.get(date),
+    heartRateZones: buildZones(zonesByDate.get(date), minutesByDate.get(date)),
+    points: downsample(points, detailLevel),
+  };
+}

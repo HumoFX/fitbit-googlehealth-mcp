@@ -173,10 +173,7 @@ export function registerFoodWriteTools(
       description:
         'Remove a previously logged food entry by its logId (from log_food or log_meal_photo output). Use this to undo a mistake.',
       inputSchema: {
-        logId: z
-          .number()
-          .int()
-          .describe('logId returned from a prior log_food / log_meal_photo call.'),
+        logId: LogIdSchema.describe('logId returned from a prior log_food / log_meal_photo call.'),
         date: z
           .string()
           .describe(

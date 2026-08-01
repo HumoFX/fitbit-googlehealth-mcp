@@ -41,6 +41,7 @@ import {
   getSkinTemperature,
   getSpO2,
 } from './metrics';
+import { getProfile, listDevices } from './profile';
 import { getSleep, getSleepRange } from './sleep';
 import {
   deleteByType,
@@ -104,11 +105,11 @@ export class GoogleHealthProvider implements HealthProvider {
   }
 
   // ---------- Read: not ported yet ----------
-  async getProfile(): Promise<Profile> {
-    notImplemented('get_profile');
+  getProfile(): Promise<Profile> {
+    return getProfile(this.client);
   }
-  async listDevices(): Promise<Device[]> {
-    notImplemented('list_devices');
+  listDevices(): Promise<Device[]> {
+    return listDevices(this.client);
   }
   async getExerciseList(_opts: { beforeDate?: string; limit?: number }): Promise<ExerciseLog[]> {
     notImplemented('get_exercise_list');

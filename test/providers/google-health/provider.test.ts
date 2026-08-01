@@ -34,9 +34,13 @@ describe('GoogleHealthProvider', () => {
 
   it('rejects the reads that are not ported yet with a clear error', async () => {
     const provider = new GoogleHealthProvider(envWithFreshToken());
-    await expect(provider.getProfile()).rejects.toThrow(/not implemented|not supported/i);
-    await expect(provider.getFoodLog('2026-07-31')).rejects.toThrow(/google_health/);
-    await expect(provider.listDevices()).rejects.toThrow(/HEALTH_PROVIDER=fitbit/);
+    await expect(provider.getFoodLog('2026-07-31')).rejects.toThrow(
+      /not implemented|not supported/i,
+    );
+    await expect(provider.getBodyLog('2026-07-01', '2026-07-31')).rejects.toThrow(/google_health/);
+    await expect(provider.getHeartRateIntraday('2026-07-31', '1min')).rejects.toThrow(
+      /HEALTH_PROVIDER=fitbit/,
+    );
   });
 });
 

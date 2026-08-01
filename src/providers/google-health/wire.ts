@@ -75,6 +75,15 @@ export function shiftToLocalIso(utcIso: string, offset: string | undefined): str
   return shifted.toISOString().slice(0, 23);
 }
 
+/** `2026-07-05` → `{year: 2026, month: 7, day: 5}` */
+export function isoToGhDate(date: string): GhDate {
+  const [year, month, day] = date.split('-').map(Number);
+  if (year === undefined || month === undefined || day === undefined) {
+    throw new RangeError(`Expected YYYY-MM-DD date, got: ${date}`);
+  }
+  return { year, month, day };
+}
+
 /** `2026-01-31` → `2026-02-01` (UTC-safe day increment). */
 export function nextDayIso(date: string): string {
   const next = new Date(Date.parse(`${date}T00:00:00Z`) + 24 * 60 * 60 * 1000);

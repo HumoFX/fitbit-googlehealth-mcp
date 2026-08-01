@@ -1,0 +1,44 @@
+{
+  "dataPoints": [
+    {
+      "name": "users/me/dataTypes/daily-heart-rate-zones/dataPoints/zones-0730",
+      "dailyHeartRateZones": {
+        "date": { "year": 2026, "month": 7, "day": 30 },
+        "heartRateZones": [
+          { "heartRateZoneType": "LIGHT", "minBeatsPerMinute": "97", "maxBeatsPerMinute": "118" },
+          {
+            "heartRateZoneType": "MODERATE",
+            "minBeatsPerMinute": "119",
+            "maxBeatsPerMinute": "139"
+          },
+          {
+            "heartRateZoneType": "VIGOROUS",
+            "minBeatsPerMinute": "140",
+            "maxBeatsPerMinute": "162"
+          },
+          { "heartRateZoneType": "PEAK", "minBeatsPerMinute": "163", "maxBeatsPerMinute": "220" }
+        ]
+      }
+    },
+    {
+      "name": "users/me/dataTypes/daily-heart-rate-zones/dataPoints/zones-0731",
+      "dailyHeartRateZones": {
+        "date": { "year": 2026, "month": 7, "day": 31 },
+        "heartRateZones": [
+          { "heartRateZoneType": "LIGHT", "minBeatsPerMinute": "97", "maxBeatsPerMinute": "118" },
+          {
+            "heartRateZoneType": "MODERATE",
+            "minBeatsPerMinute": "119",
+            "maxBeatsPerMinute": "139"
+          },
+          {
+            "heartRateZoneType": "VIGOROUS",
+            "minBeatsPerMinute": "140",
+            "maxBeatsPerMinute": "162"
+          },
+          { "heartRateZoneType": "PEAK", "minBeatsPerMinute": "163", "maxBeatsPerMinute": "220" }
+        ]
+      }
+    }
+  ]
+}

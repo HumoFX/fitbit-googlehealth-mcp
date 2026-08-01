@@ -40,8 +40,10 @@ export const DevicesResponseSchema = z.array(DeviceSchema);
 // ---------- Heart rate zones (shared by daily summary + HR endpoints) ----------
 export const HeartRateZoneSchema = z.object({
   name: z.string(),
-  min: z.number(),
-  max: z.number(),
+  // Optional because Google Health can report time-in-zone for a zone whose
+  // bpm thresholds are missing that day (Fitbit always sends both).
+  min: z.number().optional(),
+  max: z.number().optional(),
   minutes: z.number().optional(),
   caloriesOut: z.number().optional(),
 });

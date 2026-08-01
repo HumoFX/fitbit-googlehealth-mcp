@@ -36,9 +36,7 @@ describe('GoogleHealthProvider', () => {
     const provider = new GoogleHealthProvider(envWithFreshToken());
     await expect(provider.getProfile()).rejects.toThrow(/not implemented|not supported/i);
     await expect(provider.getFoodLog('2026-07-31')).rejects.toThrow(/google_health/);
-    await expect(provider.getSpO2('2026-07-01', '2026-07-31')).rejects.toThrow(
-      /HEALTH_PROVIDER=fitbit/,
-    );
+    await expect(provider.listDevices()).rejects.toThrow(/HEALTH_PROVIDER=fitbit/);
   });
 });
 

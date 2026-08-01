@@ -34,7 +34,13 @@ import type {
 import { getActivityTimeSeries, getDailySummary } from './activity';
 import { GoogleHealthClient } from './client';
 import { getHeartRateRange } from './heart';
-import { getHRV } from './metrics';
+import {
+  getCardioFitness,
+  getHRV,
+  getRespiratoryRate,
+  getSkinTemperature,
+  getSpO2,
+} from './metrics';
 import { getSleep, getSleepRange } from './sleep';
 import {
   deleteByType,
@@ -119,17 +125,17 @@ export class GoogleHealthProvider implements HealthProvider {
   async getFoodLog(_date: string): Promise<FoodLog> {
     notImplemented('get_food_log');
   }
-  async getSpO2(_start: string, _end: string): Promise<SpO2Day[]> {
-    notImplemented('get_spo2');
+  getSpO2(start: string, end: string): Promise<SpO2Day[]> {
+    return getSpO2(this.client, start, end);
   }
-  async getRespiratoryRate(_start: string, _end: string): Promise<RespiratoryRateDay[]> {
-    notImplemented('get_respiratory_rate');
+  getRespiratoryRate(start: string, end: string): Promise<RespiratoryRateDay[]> {
+    return getRespiratoryRate(this.client, start, end);
   }
-  async getSkinTemperature(_start: string, _end: string): Promise<SkinTempDay[]> {
-    notImplemented('get_skin_temperature');
+  getSkinTemperature(start: string, end: string): Promise<SkinTempDay[]> {
+    return getSkinTemperature(this.client, start, end);
   }
-  async getCardioFitness(_date: string): Promise<CardioFitness> {
-    notImplemented('get_cardio_fitness');
+  getCardioFitness(date: string): Promise<CardioFitness> {
+    return getCardioFitness(this.client, date);
   }
 
   // ---------- Write ----------

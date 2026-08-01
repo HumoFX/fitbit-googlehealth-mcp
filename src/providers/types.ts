@@ -315,6 +315,10 @@ export const SkinTempDaySchema = z.object({
   dateTime: z.string(),
   value: z.object({
     nightlyRelative: z.number().optional(),
+    // Google Health also reports the absolute nightly reading and the
+    // baseline it is compared against; Fitbit only ever sent the delta.
+    nightlyAbsoluteCelsius: z.number().optional(),
+    baselineCelsius: z.number().optional(),
   }),
   logType: z.string().optional(),
 });

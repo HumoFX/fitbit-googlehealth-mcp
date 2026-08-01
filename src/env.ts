@@ -1,6 +1,11 @@
 export type Env = {
   TOKENS: KVNamespace;
   CACHE: KVNamespace;
+  /**
+   * Bound only on multi-user deployments; its presence switches the Worker
+   * from the shared-secret single-user surface to the OAuth server.
+   */
+  OAUTH_KV?: KVNamespace;
   FITBIT_CLIENT_ID: string;
   FITBIT_CLIENT_SECRET: string;
   MCP_SHARED_SECRET: string;

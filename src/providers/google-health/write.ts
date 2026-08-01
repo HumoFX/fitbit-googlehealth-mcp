@@ -34,11 +34,14 @@ export type SessionInterval = {
   endUtcOffset: string;
 };
 
+// The API rejects an empty window ("start time must be strictly earlier
+// than end time"), so instantaneous logs get a one-minute one.
+const POINT_IN_TIME_WINDOW_MS = 60_000;
+
 /**
  * A SessionTimeInterval for logs that span a window (meals, hydration,
- * exercise, sleep). Point-in-time logs get a zero-length window; without an
- * explicit time we use local noon, which keeps the entry on the intended
- * civil date regardless of the offset.
+ * exercise, sleep). Without an explicit time we use local noon, which keeps
+ * the entry on the intended civil date regardless of the offset.
  */
 export function toSessionInterval(opts: {
   date: string;
@@ -46,9 +49,9 @@ export function toSessionInterval(opts: {
   durationMs?: number;
 }): SessionInterval {
   const startTime = localToUtcIso(opts.date, opts.time ?? '12:00');
-  const endTime = opts.durationMs
-    ? new Date(Date.parse(startTime) + opts.durationMs).toISOString()
-    : startTime;
+  const endTime = new Date(
+    Date.parse(startTime) + (opts.durationMs || POINT_IN_TIME_WINDOW_MS),
+  ).toISOString();
   return {
     startTime,
     endTime,

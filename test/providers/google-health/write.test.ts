@@ -42,8 +42,16 @@ describe('toSessionInterval / toSampleTime', () => {
   it('defaults to noon local time when no time is given', () => {
     const interval = toSessionInterval({ date: '2026-08-01' });
     expect(interval.startTime).toBe('2026-08-01T03:00:00.000Z');
-    // a point-in-time log is a zero-length window
-    expect(interval.endTime).toBe(interval.startTime);
+  });
+
+  it('gives point-in-time logs a non-empty window', () => {
+    // The API rejects a zero-length interval outright:
+    // "Data point start time must be strictly earlier than end time."
+    const interval = toSessionInterval({ date: '2026-08-01' });
+    expect(Date.parse(interval.endTime)).toBeGreaterThan(Date.parse(interval.startTime));
+
+    const explicitZero = toSessionInterval({ date: '2026-08-01', durationMs: 0 });
+    expect(Date.parse(explicitZero.endTime)).toBeGreaterThan(Date.parse(explicitZero.startTime));
   });
 
   it('builds a sample time with the JST offset', () => {

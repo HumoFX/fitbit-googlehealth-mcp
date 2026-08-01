@@ -17,7 +17,7 @@ export function registerSleepReadTools(
     {
       title: 'Sleep logs for one day',
       description:
-        'Fitbit sleep logs (v1.2) for a date, including stage data (deep/light/rem/wake) when the device captured them. Defaults to today (JST). Cached 1h.',
+        'Sleep logs for a date, including stage data (deep/light/rem/wake) when the device captured them. Defaults to today (JST). Cached 1h.',
       inputSchema: {
         date: z.string().describe('YYYY-MM-DD. Omit for today (JST).').optional(),
       },
@@ -45,7 +45,7 @@ export function registerSleepReadTools(
     {
       title: 'Sleep logs across a date range',
       description:
-        'Fitbit sleep logs (v1.2) across a date range. Good for week-over-week comparisons. Cached 1h.',
+        'Sleep logs across a date range. Good for week-over-week comparisons. Cached 1h.',
       inputSchema: {
         start: z.string().describe('YYYY-MM-DD'),
         end: z.string().describe('YYYY-MM-DD'),

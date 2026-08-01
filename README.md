@@ -32,6 +32,47 @@ Fitbit は **2026 年 9 月**に既存の Web API(`api.fitbit.com`)を完全停�
 
 詳細は [`docs/research.md`](docs/research.md) を参照。
 
+### Google Health provider (read MVP, 2026-08)
+
+`src/providers/google-health/` implements the read-side MVP against the
+Google Health API v4 (`health.googleapis.com/v4`). Select the backend with
+the `HEALTH_PROVIDER` var in `wrangler.toml` (`fitbit` — default, full tool
+set — or `google_health`).
+
+Covered tools: `get_sleep`, `get_sleep_range`, `get_daily_summary`,
+`get_activity_timeseries`, `get_heart_rate_range`, `get_hrv`. All other
+tools return a descriptive "not implemented" error under `google_health`.
+
+Setup:
+
+1. Enable **Google Health API** in a Google Cloud project and create an
+   OAuth client (type "Web application") with redirect URI
+   `http://127.0.0.1:8788/google-health/callback`. Publish the consent
+   screen (**"In production"** — in "Testing" refresh tokens expire after
+   7 days and the unattended Worker refresh breaks).
+2. `export GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...` →
+   `pnpm run setup:google-health`, then copy-paste the printed
+   `wrangler secret put` / `wrangler kv key put` commands (`gh_*` keys —
+   Fitbit tokens stay untouched, both providers can coexist).
+3. Set `HEALTH_PROVIDER = "google_health"` and `pnpm deploy`.
+
+Notable mapping differences vs Fitbit (see commit history and
+`docs/research.md` for details):
+
+- Sleep: `efficiency` is gone (no Google Health equivalent);
+  `logId` is a resource-name string; stage segments come from
+  `sleep.stages` with `AWAKE/LIGHT/DEEP/REM` enums.
+- Daily summary: assembled from ~10 per-type requests (rollups + daily
+  reads); `goals`, `caloriesBMR`, `marginalCalories` are not populated.
+- Heart-rate zones: named `Light/Moderate/Vigorous/Peak` (Karvonen
+  thresholds) instead of Fitbit's `Out of Range/Fat Burn/Cardio/Peak`;
+  per-zone `caloriesOut` is not populated.
+- `get_activity_timeseries`: `caloriesBMR` resource is unsupported;
+  `calories` and `minutes*Active` ranges are chunked at the API's 14-day
+  cap transparently.
+- Rate limits are per-minute (300 req/min/user) instead of Fitbit's
+  150 req/h; the 1h response cache is kept regardless.
+
 ---
 
 ## 前提

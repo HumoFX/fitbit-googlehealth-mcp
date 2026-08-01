@@ -415,3 +415,65 @@ Fitbit モバイルを経由せず、直接 API を叩いて栄養素フィー�
 - 移行着手の最適タイミングは GH API 安定後の **~2026-08**(続ける場合)。`HealthProvider` 抽象と Pattern B が正しかったので like-for-like の段階移行で済む見込み
 - 移行のユーザー実益としてはっきりしているのは食事ログ書き込みのクリーン化のみ。read 主体なら移行はほぼ強制メンテ、という整理
 - 今回は docs(research.md + journal.md)更新のみコミット
+
+---
+
+## 2026-08-01 / GoogleHealthProvider — read MVP (EN)
+
+Implemented the first slice of the Google Health migration planned in the
+2026-05-31 entry. Recon first (fresh doc fan-out + the v4 Discovery doc at
+`https://health.googleapis.com/$discovery/rest?version=v4`), then TDD per
+module. English entry — this work happened in a fork context.
+
+### Recon corrections to research.md (as of 2026-08-01)
+
+- The dataPoints resource has **six read methods**, not four: `get`, `list`,
+  `reconcile`, `rollUp`, `dailyRollUp`, `exportExerciseTcx` (+ writes
+  `create` / `patch` / `batchDelete`). `reconcile` is **GET** (docs pages
+  disagreed; Discovery doc settles it).
+- Sleep supports a dedicated **`sleep.interval.civil_end_time`** filter —
+  exactly Fitbit's `dateOfSleep` semantics, no client-side post-filtering.
+- Zone bpm thresholds survive (`daily-heart-rate-zones`, Karvonen
+  LIGHT/MODERATE/VIGOROUS/PEAK); minutes come from `time-in-heart-rate-zone`
+  rollups. Per-zone caloriesOut would need `calories-in-heart-rate-zone`
+  (14-day cap) — skipped in the MVP.
+- `heart-rate`'s owning scope is documented inconsistently
+  (activity_and_fitness on /health/data-types vs
+  health_metrics_and_measurements on /health/migration/api-specifications).
+  The setup script requests both readonly scopes plus sleep.readonly.
+- Release notes show no breaking changes after the 2026-05-26 scope split —
+  the "wait until ~2026-08" call from the May entry held up.
+
+### What landed
+
+- `src/providers/google-health/`: oauth (gh_* KV keys, non-rotating
+  refresh, no Basic auth), client (401-refresh + 429-backoff retries,
+  zod validation, nextPageToken paginator), wire primitives (int64
+  strings, google-durations, google.type.Date, civil datetimes, AIP-160
+  civil range filters), sleep via `:reconcile`, activity time series +
+  composite daily summary via `:dailyRollUp` (range chunking at the
+  14/90-day caps), heart-rate range (3-source merge), daily HRV.
+- `HEALTH_PROVIDER=fitbit|google_health` switch in `buildServer` +
+  provider-namespaced cache keys (`fitbit:` / `google_health:` prefixes)
+  so switching backends never serves the other provider's cache.
+- `scripts/setup-google-health.ts` + `pnpm run setup:google-health`.
+- Non-MVP methods throw a descriptive error pointing back to
+  `HEALTH_PROVIDER=fitbit`.
+
+### Deliberate losses (no Google Health source)
+
+sleep `efficiency` / `infoCode`; daily-summary `goals`, `caloriesBMR`
+(exists as `basal-energy-burned` but has no rollup), `marginalCalories`;
+per-zone `caloriesOut`; numeric `logId` (now resource-name strings —
+`SleepLogSchema.logId` widened to `number | string`;
+`HeartRateZoneSchema.min/max` widened to optional).
+
+### Still open before September
+
+- Live probe against real data (schemas are Discovery-doc-derived;
+  fixtures encode my reading of them).
+- Remaining reads (profile via `users.getProfile`, devices via
+  `pairedDevices`, SpO2 / BR / skin-temp / VO2max daily types, exercise
+  list) and the write side (`create` returns a long-running Operation —
+  different contract than Fitbit's synchronous echo).
+- Fitbit-flavoured wording in a few non-MVP tool descriptions.

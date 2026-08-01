@@ -84,6 +84,9 @@ export default {
       tokenEndpoint: '/token',
       clientRegistrationEndpoint: '/register',
       scopesSupported: ['health.read'],
+      // The MCP spec requires PKCE; refuse the downgradable `plain` method
+      // so it is neither accepted nor advertised in the AS metadata.
+      allowPlainPKCE: false,
     });
     return provider.fetch(request, env as never, ctx);
   },

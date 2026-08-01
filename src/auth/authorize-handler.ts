@@ -39,7 +39,19 @@ export function buildAuthorizeApp(): Hono<{ Bindings: OAuthEnv }> {
   // Step 1 — claude.ai sends the user here. Park the MCP auth request and
   // bounce to Google so the user grants access to their own health data.
   app.get('/authorize', async (c) => {
-    const oauthReq = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
+    let oauthReq: AuthRequest;
+    try {
+      oauthReq = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
+    } catch (err) {
+      // Someone opened /authorize directly instead of arriving from an MCP
+      // client — answer with guidance rather than a stack trace.
+      const message = err instanceof Error ? err.message : String(err);
+      return c.text(
+        `Not a valid OAuth authorization request (${message}). ` +
+          'Add this server as a custom connector in claude.ai instead of opening this URL directly.',
+        400,
+      );
+    }
     if (!c.env.GOOGLE_CLIENT_ID) {
       return c.text('Server misconfigured: GOOGLE_CLIENT_ID is not set.', 500);
     }

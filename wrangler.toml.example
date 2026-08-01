@@ -32,3 +32,13 @@ id = "<your-cache-namespace-id>"
 # For HEALTH_PROVIDER = "google_health" (Google Cloud OAuth client):
 #   wrangler secret put GOOGLE_CLIENT_ID
 #   wrangler secret put GOOGLE_CLIENT_SECRET
+
+# Multi-user mode (optional): bind OAUTH_KV to turn the Worker into an OAuth
+# server so anyone can connect it with their own Google account. Create with
+#   wrangler kv namespace create OAUTH_KV
+# and add the Worker's callback URL to the Google OAuth client's Authorized
+# redirect URIs: https://<worker>.<subdomain>.workers.dev/oauth/google/callback
+# Without this binding the Worker stays single-user (shared-secret URL).
+# [[kv_namespaces]]
+# binding = "OAUTH_KV"
+# id = "<your-oauth-kv-namespace-id>"

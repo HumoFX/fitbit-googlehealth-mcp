@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { GoogleHealthApiError, GoogleHealthRateLimitError } from '../../../src/lib/errors';
 import { GoogleHealthClient, paginate } from '../../../src/providers/google-health/client';

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Health MCP logo">
+  <rect width="512" height="512" rx="124" fill="#0E7C7B"/>
+  <path d="M256 410 C 103 300, 74 176, 143 129 C 198 92, 242 121, 256 161 C 270 121, 314 92, 369 129 C 438 176, 409 300, 256 410 Z" fill="#FFFFFF"/>
+  <polyline points="118,242 191,242 224,169 264,330 304,206 333,242 398,242" fill="none" stroke="#0E7C7B" stroke-width="29" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

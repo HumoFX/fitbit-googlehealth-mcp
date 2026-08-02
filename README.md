@@ -1,4 +1,8 @@
+<img src="assets/logo-bridge.svg" alt="" width="88" align="left" hspace="16" vspace="4">
+
 # fitbit-googlehealth-mcp
+
+<br clear="left">
 
 > Fitbit の広範なヘルスデータを取得し、食事写真から食事ログを書き込める **Model Context Protocol (MCP) サーバー**。TypeScript 実装、Cloudflare Workers にデプロイ。Claude モバイル / Claude Desktop / Claude.ai から接続して使えます。
 

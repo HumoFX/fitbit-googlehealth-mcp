@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { buildAuthorizeApp } from './auth/authorize-handler';
 import { guardMiddleware } from './auth/guard';
 import type { Env } from './env';
+import { landingPage, privacyPage, termsPage } from './pages';
 import { buildServer } from './server';
 
 /**
@@ -13,7 +14,9 @@ import { buildServer } from './server';
  */
 const legacyApp = new Hono<{ Bindings: Env }>();
 
-legacyApp.get('/', (c) => c.text('fitbit-googlehealth-mcp — see /health and POST /mcp/:secret'));
+legacyApp.get('/', () => landingPage());
+legacyApp.get('/privacy', () => privacyPage());
+legacyApp.get('/terms', () => termsPage());
 
 legacyApp.get('/health', (c) =>
   c.json({

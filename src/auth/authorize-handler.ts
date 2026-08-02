@@ -1,6 +1,7 @@
 import type { AuthRequest, OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import { Hono } from 'hono';
 import type { Env } from '../env';
+import { landingPage, privacyPage, termsPage } from '../pages';
 import { persistGoogleTokens } from '../providers/google-health/oauth';
 import { buildGoogleAuthUrl, exchangeGoogleCode } from './google-login';
 
@@ -23,9 +24,9 @@ function pendingKey(state: string): string {
 export function buildAuthorizeApp(): Hono<{ Bindings: OAuthEnv }> {
   const app = new Hono<{ Bindings: OAuthEnv }>();
 
-  app.get('/', (c) =>
-    c.text('fitbit-googlehealth-mcp — connect this URL as a custom connector in claude.ai'),
-  );
+  app.get('/', () => landingPage());
+  app.get('/privacy', () => privacyPage());
+  app.get('/terms', () => termsPage());
 
   app.get('/health', (c) =>
     c.json({

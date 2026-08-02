@@ -713,3 +713,21 @@ requires `googlehealth.settings.readonly` and `users.getProfile` requires
 second time a scope family only revealed itself when a tool was first
 called for real — the Discovery doc lists per-method scopes, so this is
 checkable up front and is now part of what to verify when adding a method.
+
+### Confirmation: devices really do carry battery and sync time
+
+After reconnecting with the profile/settings scopes, `list_devices`
+returned exactly what the corrected schema predicted:
+
+```
+Fitbit Air   — battery "High", batteryLevel 82,
+               lastSyncTime 2026-08-02T05:18:08Z, mac, 48 feature flags
+MobileTrack  — battery "Empty", lastSyncTime 2026-08-01T22:15:26Z
+```
+
+So the "biggest loss of the migration" I claimed in the first draft of
+this entry was purely my own misreading of the Discovery doc, and the
+review's correction is confirmed against the live API. `get_profile`
+likewise returns timezone, unit preferences, locale and membership date —
+only the fields Google genuinely has no counterpart for (display name,
+date of birth, height, weight) stay empty.

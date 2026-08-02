@@ -18,6 +18,8 @@ export const GOOGLE_LOGIN_SCOPES = [
   'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
   'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
   'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
+  'https://www.googleapis.com/auth/googlehealth.profile.readonly',
+  'https://www.googleapis.com/auth/googlehealth.settings.readonly',
   // Writes — Google splits read and write, so the log_* tools need their own
   // scopes: nutrition covers food and hydration logs, health_metrics covers
   // weight and body fat, activity_and_fitness covers exercise sessions.

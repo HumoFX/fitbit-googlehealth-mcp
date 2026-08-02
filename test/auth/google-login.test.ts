@@ -32,6 +32,17 @@ describe('GOOGLE_LOGIN_SCOPES', () => {
     );
   });
 
+  it('requests the profile and settings scopes get_profile / list_devices need', () => {
+    // users.getProfile needs profile.readonly; getSettings and
+    // pairedDevices.list both need settings.readonly.
+    expect(GOOGLE_LOGIN_SCOPES).toContain(
+      'https://www.googleapis.com/auth/googlehealth.profile.readonly',
+    );
+    expect(GOOGLE_LOGIN_SCOPES).toContain(
+      'https://www.googleapis.com/auth/googlehealth.settings.readonly',
+    );
+  });
+
   it('requests the write scopes the log_* tools need', () => {
     // Google splits read and write; without these every write returns 403.
     for (const suffix of [

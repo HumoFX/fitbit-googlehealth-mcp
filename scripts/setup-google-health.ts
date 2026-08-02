@@ -48,6 +48,8 @@ const SCOPES = [
   'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
   'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
   'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
+  'https://www.googleapis.com/auth/googlehealth.profile.readonly',
+  'https://www.googleapis.com/auth/googlehealth.settings.readonly',
   // Writes are a separate scope family; without these the log_* tools 403.
   'https://www.googleapis.com/auth/googlehealth.nutrition.writeonly',
   'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.writeonly',

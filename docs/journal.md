@@ -731,3 +731,27 @@ review's correction is confirmed against the live API. `get_profile`
 likewise returns timezone, unit preferences, locale and membership date —
 only the fields Google genuinely has no counterpart for (display name,
 date of birth, height, weight) stay empty.
+
+---
+
+## 2026-08-02 / Timezone: JST was a hard-coded inheritance
+
+Every bare `date` argument resolved to "today in JST" — sensible for the
+upstream author in Tokyo, wrong for a user in Tashkent (UTC+5), where the
+server's day starts four hours early. After 19:00 local, `get_daily_summary`
+with no date was already answering for tomorrow.
+
+Now the zone comes from the user's own profile (`users/me/settings` →
+`timeZone`, which returned `Asia/Tashkent` on the live account), cached a
+day in KV, falling back to a `DEFAULT_TIMEZONE` var and then to Asia/Tokyo
+so nothing changes for anyone who was happy before. Offsets are computed
+with `Intl` at the relevant instant, so daylight saving is handled instead
+of assumed away — the write path used a fixed `+9h` string for
+`startUtcOffset`, which would have been wrong twice a year in any DST zone
+regardless of the base offset.
+
+One trap avoided: the first cut held the write zone in a module-level
+variable, exactly the shape of the token-memory bug from the multi-user
+work — two users writing from the same isolate would have shared one
+offset and landed each other's entries hours away. The zone is threaded
+through the write inputs instead.

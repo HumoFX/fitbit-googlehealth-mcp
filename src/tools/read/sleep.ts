@@ -2,8 +2,9 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Env } from '../../env';
 import { cacheKey, getCached } from '../../lib/cache';
-import { assertIsoDate, normalizeRange, todayJst } from '../../lib/date';
+import { assertIsoDate, normalizeRange } from '../../lib/date';
 import { toolErrorResult } from '../../lib/errors';
+import { resolveToday } from '../../lib/timezone';
 import type { HealthProvider } from '../../providers/types';
 import { SleepLogSchema } from '../../providers/types';
 
@@ -25,7 +26,7 @@ export function registerSleepReadTools(
     },
     async ({ date }) => {
       try {
-        const d = date ?? todayJst();
+        const d = date ?? (await resolveToday(env, provider));
         assertIsoDate(d, 'date');
         const sleep = await getCached(env, cacheKey('get_sleep', { date: d }), () =>
           provider.getSleep(d),

@@ -2,8 +2,9 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Env } from '../../env';
 import { cacheKey, invalidate } from '../../lib/cache';
-import { assertIsoDate, todayJst } from '../../lib/date';
+import { assertIsoDate, todayInZone } from '../../lib/date';
 import { toolErrorResult } from '../../lib/errors';
+import { applyTimeZone } from '../../lib/timezone';
 import type { HealthProvider } from '../../providers/types';
 import { ExerciseLogSchema, LogIdSchema } from '../../providers/types';
 
@@ -45,7 +46,8 @@ export function registerActivityWriteTool(
     },
     async (input) => {
       try {
-        const date = input.date ?? todayJst();
+        const timeZone = await applyTimeZone(env, provider);
+        const date = input.date ?? todayInZone(timeZone);
         assertIsoDate(date, 'date');
         if (!input.activityId && !input.activityName) {
           throw new RangeError('Either activityId or activityName must be provided.');
@@ -53,7 +55,7 @@ export function registerActivityWriteTool(
         if (input.activityName && input.manualCalories === undefined) {
           throw new RangeError('manualCalories is required when using activityName.');
         }
-        const entry = await provider.logActivity({ ...input, date });
+        const entry = await provider.logActivity({ ...input, date, timeZone });
         await invalidate(
           env,
           cacheKey('get_daily_summary', { date }),
@@ -87,7 +89,8 @@ export function registerActivityWriteTool(
     async ({ logId, date }) => {
       try {
         await provider.deleteActivityLog(logId);
-        const d = date ?? todayJst();
+        const timeZone = await applyTimeZone(env, provider);
+        const d = date ?? todayInZone(timeZone);
         assertIsoDate(d, 'date');
         await invalidate(
           env,

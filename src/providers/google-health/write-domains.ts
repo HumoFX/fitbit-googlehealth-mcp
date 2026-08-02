@@ -1,4 +1,4 @@
-import { toJstDateString } from '../../lib/date';
+import { DEFAULT_FALLBACK_TIMEZONE, dateStringInZone, offsetSecondsInZone } from '../../lib/date';
 import type {
   BodyFatLog,
   ExerciseLog,
@@ -48,6 +48,7 @@ const NUTRIENT_FIELDS: Array<{
 
 function buildNutritionLog(opts: {
   date: string;
+  timeZone?: string;
   mealType: Parameters<typeof toMealTypeEnum>[0];
   foodName: string;
   calories: number;
@@ -60,7 +61,7 @@ function buildNutritionLog(opts: {
   });
 
   return {
-    interval: toSessionInterval({ date: opts.date }),
+    interval: toSessionInterval({ date: opts.date, timeZone: opts.timeZone }),
     foodDisplayName: opts.foodName,
     mealType: toMealTypeEnum(opts.mealType),
     energy: { kcal: opts.calories, userProvidedUnit: 'KILOCALORIE' },
@@ -108,6 +109,7 @@ export async function logMeal(
         foodName: item.name,
         calories: item.calories,
         nutritionalValues: { protein: item.protein, carbs: item.carbs, fat: item.fat },
+        timeZone: input.timeZone,
       }),
     });
     entries.push(foodEntry(name, { ...item, foodName: item.name, date: input.date }));
@@ -121,7 +123,7 @@ export async function logWater(
 ): Promise<WaterLogEntry> {
   const name = await createDataPoint(client, 'hydration-log', {
     hydrationLog: {
-      interval: toSessionInterval({ date: input.date }),
+      interval: toSessionInterval({ date: input.date, timeZone: input.timeZone }),
       amountConsumed: { milliliters: input.amountMl, userProvidedUnit: 'MILLILITER' },
     },
   });
@@ -134,7 +136,7 @@ export async function logWeight(
 ): Promise<WeightLog> {
   const name = await createDataPoint(client, 'weight', {
     weight: {
-      sampleTime: toSampleTime({ date: input.date, time: input.time }),
+      sampleTime: toSampleTime({ date: input.date, time: input.time, timeZone: input.timeZone }),
       weightGrams: Math.round(input.weightKg * 1000),
     },
   });
@@ -147,7 +149,7 @@ export async function logBodyFat(
 ): Promise<BodyFatLog> {
   const name = await createDataPoint(client, 'body-fat', {
     bodyFat: {
-      sampleTime: toSampleTime({ date: input.date, time: input.time }),
+      sampleTime: toSampleTime({ date: input.date, time: input.time, timeZone: input.timeZone }),
       percentage: input.fatPercent,
     },
   });
@@ -208,7 +210,12 @@ export async function logActivity(
 
   const name = await createDataPoint(client, 'exercise', {
     exercise: {
-      interval: toSessionInterval({ date: input.date, time, durationMs: input.durationMs }),
+      interval: toSessionInterval({
+        date: input.date,
+        time,
+        durationMs: input.durationMs,
+        timeZone: input.timeZone,
+      }),
       exerciseType: toExerciseType(displayName),
       displayName,
       // Required by the API even when a manual log carries no device metrics.
@@ -235,14 +242,17 @@ export async function logSleep(
     date: input.date,
     time: input.startTime,
     durationMs: input.durationMs,
+    timeZone: input.timeZone,
   });
   const name = await createDataPoint(client, 'sleep', { sleep: { interval } });
 
   // A sleep belongs to the date it ended, matching Fitbit's dateOfSleep.
-  const endLocalMs = Date.parse(interval.endTime) + 9 * 3600_000;
+  const zone = input.timeZone ?? DEFAULT_FALLBACK_TIMEZONE;
+  const endInstant = new Date(Date.parse(interval.endTime));
+  const endLocalMs = endInstant.getTime() + offsetSecondsInZone(endInstant, zone) * 1000;
   return {
     logId: name,
-    dateOfSleep: toJstDateString(new Date(Date.parse(interval.endTime))),
+    dateOfSleep: dateStringInZone(endInstant, zone),
     startTime: `${input.date}T${input.startTime}:00.000`,
     endTime: new Date(endLocalMs).toISOString().slice(0, 23),
     duration: input.durationMs,

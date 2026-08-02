@@ -348,7 +348,10 @@ export const CardioFitnessSchema = z.object({
 export type CardioFitness = z.infer<typeof CardioFitnessSchema>;
 
 // ---------- Write inputs ----------
-export type LogFoodInput = {
+/** Resolved IANA zone the `date`/`time` fields are expressed in. */
+export type ZonedInput = { timeZone?: string };
+
+export type LogFoodInput = ZonedInput & {
   date: string;
   mealType: MealTypeT;
   /** Free-text food name (Japanese OK). Written to Fitbit as a private entry. */
@@ -371,31 +374,31 @@ export type MealItemInput = {
   confidence?: 'high' | 'medium' | 'low';
 };
 
-export type LogMealInput = {
+export type LogMealInput = ZonedInput & {
   date: string;
   mealType: MealTypeT;
   items: MealItemInput[];
   notes?: string;
 };
 
-export type LogWaterInput = {
+export type LogWaterInput = ZonedInput & {
   date: string;
   amountMl: number;
 };
 
-export type LogWeightInput = {
+export type LogWeightInput = ZonedInput & {
   date: string;
   time?: string;
   weightKg: number;
 };
 
-export type LogBodyFatInput = {
+export type LogBodyFatInput = ZonedInput & {
   date: string;
   time?: string;
   fatPercent: number;
 };
 
-export type LogActivityInput = {
+export type LogActivityInput = ZonedInput & {
   date: string;
   startTime: string; // HH:mm:ss
   activityId?: number;
@@ -405,7 +408,7 @@ export type LogActivityInput = {
   distanceKm?: number;
 };
 
-export type LogSleepInput = {
+export type LogSleepInput = ZonedInput & {
   date: string;
   startTime: string; // HH:mm
   durationMs: number;

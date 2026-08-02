@@ -2,8 +2,9 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Env } from '../../env';
 import { cacheKey, invalidate } from '../../lib/cache';
-import { assertIsoDate, todayJst } from '../../lib/date';
+import { assertIsoDate, todayInZone } from '../../lib/date';
 import { toolErrorResult } from '../../lib/errors';
+import { applyTimeZone } from '../../lib/timezone';
 import type { HealthProvider } from '../../providers/types';
 import {
   FoodLogEntrySchema,
@@ -54,9 +55,10 @@ export function registerFoodWriteTools(
     },
     async (input) => {
       try {
-        const date = input.date ?? todayJst();
+        const timeZone = await applyTimeZone(env, provider);
+        const date = input.date ?? todayInZone(timeZone);
         assertIsoDate(date, 'date');
-        const entry = await provider.logFood({ ...input, date });
+        const entry = await provider.logFood({ ...input, date, timeZone });
         await invalidateFoodCaches(env, date);
         return {
           structuredContent: entry,
@@ -118,9 +120,10 @@ export function registerFoodWriteTools(
     },
     async ({ date, mealType, items, notes }) => {
       try {
-        const d = date ?? todayJst();
+        const timeZone = await applyTimeZone(env, provider);
+        const d = date ?? todayInZone(timeZone);
         assertIsoDate(d, 'date');
-        const entries = await provider.logMeal({ date: d, mealType, items, notes });
+        const entries = await provider.logMeal({ date: d, mealType, items, notes, timeZone });
         await invalidateFoodCaches(env, d);
         return {
           structuredContent: { entries, mealType, date: d, notes },
@@ -151,9 +154,10 @@ export function registerFoodWriteTools(
     },
     async ({ date, amountMl }) => {
       try {
-        const d = date ?? todayJst();
+        const timeZone = await applyTimeZone(env, provider);
+        const d = date ?? todayInZone(timeZone);
         assertIsoDate(d, 'date');
-        const entry = await provider.logWater({ date: d, amountMl });
+        const entry = await provider.logWater({ date: d, amountMl, timeZone });
         await invalidateFoodCaches(env, d);
         return {
           structuredContent: entry,
@@ -186,7 +190,8 @@ export function registerFoodWriteTools(
     async ({ logId, date }) => {
       try {
         await provider.deleteFoodLog(logId);
-        const d = date ?? todayJst();
+        const timeZone = await applyTimeZone(env, provider);
+        const d = date ?? todayInZone(timeZone);
         assertIsoDate(d, 'date');
         await invalidateFoodCaches(env, d);
         return {
@@ -217,7 +222,8 @@ export function registerFoodWriteTools(
     async ({ logId, date }) => {
       try {
         await provider.deleteWaterLog(logId);
-        const d = date ?? todayJst();
+        const timeZone = await applyTimeZone(env, provider);
+        const d = date ?? todayInZone(timeZone);
         assertIsoDate(d, 'date');
         await invalidateFoodCaches(env, d);
         return {

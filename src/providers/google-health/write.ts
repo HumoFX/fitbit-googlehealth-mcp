@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEFAULT_FALLBACK_TIMEZONE, offsetSecondsInZone, zonedTimeToUtc } from '../../lib/date';
 import { GoogleHealthApiError } from '../../lib/errors';
 import type { LogId, MealTypeT } from '../types';
 import type { GoogleHealthClient } from './client';
@@ -16,16 +17,11 @@ const OperationSchema = z.object({
   response: z.record(z.string(), z.unknown()).optional(),
 });
 
-// JST is what the tool layer dates are expressed in (see lib/date.ts).
-const JST_OFFSET_SEC = 9 * 60 * 60;
-const JST_OFFSET_DURATION = `${JST_OFFSET_SEC}s`;
-
-function localToUtcIso(date: string, time: string): string {
-  const [h, m] = time.split(':').map(Number);
-  const base = Date.parse(`${date}T00:00:00Z`);
-  const ms = base + ((h ?? 0) * 3600 + (m ?? 0) * 60 - JST_OFFSET_SEC) * 1000;
-  return new Date(ms).toISOString();
-}
+/**
+ * The zone civil times are written in is passed explicitly rather than held
+ * in module state: two users writing from the same isolate would otherwise
+ * share one offset and land each other's entries hours away.
+ */
 
 export type SessionInterval = {
   startTime: string;
@@ -47,27 +43,29 @@ export function toSessionInterval(opts: {
   date: string;
   time?: string;
   durationMs?: number;
+  timeZone?: string;
 }): SessionInterval {
-  const startTime = localToUtcIso(opts.date, opts.time ?? '12:00');
-  const endTime = new Date(
-    Date.parse(startTime) + (opts.durationMs || POINT_IN_TIME_WINDOW_MS),
-  ).toISOString();
+  const zone = opts.timeZone ?? DEFAULT_FALLBACK_TIMEZONE;
+  const start = zonedTimeToUtc(opts.date, opts.time ?? '12:00', zone);
+  const end = new Date(start.getTime() + (opts.durationMs || POINT_IN_TIME_WINDOW_MS));
   return {
-    startTime,
-    endTime,
-    startUtcOffset: JST_OFFSET_DURATION,
-    endUtcOffset: JST_OFFSET_DURATION,
+    startTime: start.toISOString(),
+    endTime: end.toISOString(),
+    startUtcOffset: `${offsetSecondsInZone(start, zone)}s`,
+    endUtcOffset: `${offsetSecondsInZone(end, zone)}s`,
   };
 }
 
 /** An ObservationSampleTime for instantaneous measurements (weight, body fat). */
-export function toSampleTime(opts: { date: string; time?: string }): {
+export function toSampleTime(opts: { date: string; time?: string; timeZone?: string }): {
   physicalTime: string;
   utcOffset: string;
 } {
+  const zone = opts.timeZone ?? DEFAULT_FALLBACK_TIMEZONE;
+  const at = zonedTimeToUtc(opts.date, opts.time ?? '12:00', zone);
   return {
-    physicalTime: localToUtcIso(opts.date, opts.time ?? '12:00'),
-    utcOffset: JST_OFFSET_DURATION,
+    physicalTime: at.toISOString(),
+    utcOffset: `${offsetSecondsInZone(at, zone)}s`,
   };
 }
 

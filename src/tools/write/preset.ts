@@ -2,7 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Env } from '../../env';
 import { cacheKey, invalidate } from '../../lib/cache';
-import { assertIsoDate, todayJst } from '../../lib/date';
+import { assertIsoDate, todayInZone } from '../../lib/date';
 import { toolErrorResult } from '../../lib/errors';
 import {
   deletePreset,
@@ -12,6 +12,7 @@ import {
   savePreset,
   scalePresetNutrition,
 } from '../../lib/presets';
+import { applyTimeZone } from '../../lib/timezone';
 import type { HealthProvider } from '../../providers/types';
 import { FoodLogEntrySchema, MealType } from '../../providers/types';
 
@@ -182,7 +183,8 @@ export function registerPresetTools(server: McpServer, provider: HealthProvider,
             `Meal preset "${name}" not found. Use list_meal_presets to see what's saved.`,
           );
         }
-        const d = date ?? todayJst();
+        const timeZone = await applyTimeZone(env, provider);
+        const d = date ?? todayInZone(timeZone);
         assertIsoDate(d, 'date');
         const multiplier = amount ?? 1;
         const scaled = scalePresetNutrition(preset, multiplier);
@@ -200,6 +202,7 @@ export function registerPresetTools(server: McpServer, provider: HealthProvider,
             sodium: scaled.sodium,
             sugar: scaled.sugar,
           },
+          timeZone,
         });
         await invalidateFoodCaches(env, d);
         return {

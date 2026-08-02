@@ -2,8 +2,9 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Env } from '../../env';
 import { cacheKey, invalidate } from '../../lib/cache';
-import { assertIsoDate, todayJst } from '../../lib/date';
+import { assertIsoDate, todayInZone } from '../../lib/date';
 import { toolErrorResult } from '../../lib/errors';
+import { applyTimeZone } from '../../lib/timezone';
 import type { HealthProvider } from '../../providers/types';
 import { LogIdSchema, SleepLogSchema } from '../../providers/types';
 
@@ -39,9 +40,10 @@ export function registerSleepWriteTool(
     },
     async ({ date, startTime, durationMs }) => {
       try {
-        const d = date ?? todayJst();
+        const timeZone = await applyTimeZone(env, provider);
+        const d = date ?? todayInZone(timeZone);
         assertIsoDate(d, 'date');
-        const entry = await provider.logSleep({ date: d, startTime, durationMs });
+        const entry = await provider.logSleep({ date: d, startTime, durationMs, timeZone });
         await invalidate(env, cacheKey('get_sleep', { date: d }));
         return {
           structuredContent: entry,
@@ -73,7 +75,8 @@ export function registerSleepWriteTool(
     async ({ logId, date }) => {
       try {
         await provider.deleteSleepLog(logId);
-        const d = date ?? todayJst();
+        const timeZone = await applyTimeZone(env, provider);
+        const d = date ?? todayInZone(timeZone);
         assertIsoDate(d, 'date');
         await invalidate(env, cacheKey('get_sleep', { date: d }));
         return {

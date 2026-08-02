@@ -37,18 +37,28 @@ function page(title: string, body: string): Response {
   );
 }
 
+/** Must match the app name on the Google OAuth consent screen. */
+const APP_NAME = 'Health Bridge MCP';
+
 export function landingPage(): Response {
   return page(
-    'Health MCP',
+    APP_NAME,
     `${LOGO}
-<h1>Health MCP</h1>
+<h1>${APP_NAME}</h1>
 <p class="lede">A personal bridge between your AI assistant and your own
 Google Health data.</p>
-<p>This server speaks the <a href="https://modelcontextprotocol.io">Model
-Context Protocol</a>. Connect it to an assistant such as Claude and you can
-ask about your sleep, activity, heart rate and nutrition in plain language,
-or log a meal from a photo — the assistant reads and writes your data
-through the Google Health API on your behalf.</p>
+<h2>What this app does</h2>
+<p>${APP_NAME} is a <a href="https://modelcontextprotocol.io">Model Context
+Protocol</a> server. Once you connect it to an AI assistant such as Claude
+and sign in with your Google account, the assistant can read your health
+data — sleep, activity, heart rate and variability, body measurements,
+nutrition — and answer questions about it in plain language. It can also
+write entries back: log a meal from a photo, record water, weight, a
+workout or a night of sleep.</p>
+<p>It exists so health data you already have stops being trapped behind an
+app you have to scroll through, and becomes something you can simply ask
+about. It requests access to your Google Health data for that purpose and
+no other.</p>
 <h2>Connecting</h2>
 <p>Add this URL as a custom connector, then sign in with the Google account
 your health data lives in:</p>
@@ -59,13 +69,14 @@ own data.</p>
 <p>Only OAuth tokens and a one-hour response cache are stored. Nothing is
 sold, shared or used for training. Revoke access at any time from your
 <a href="https://myaccount.google.com/permissions">Google account
-permissions</a>.</p>`,
+permissions</a>. See the <a href="/privacy">privacy policy</a> for
+details.</p>`,
   );
 }
 
 export function privacyPage(): Response {
   return page(
-    'Privacy policy · Health MCP',
+    `Privacy policy · ${APP_NAME}`,
     `<h1>Privacy policy</h1>
 <p class="lede">How this server handles your data.</p>
 <h2>What it is</h2>
@@ -106,7 +117,7 @@ operates the deployment you use.</p>`,
 
 export function termsPage(): Response {
   return page(
-    'Terms of service · Health MCP',
+    `Terms of service · ${APP_NAME}`,
     `<h1>Terms of service</h1>
 <p class="lede">Free, as-is, from an individual — not a company.</p>
 <h2>Using it</h2>

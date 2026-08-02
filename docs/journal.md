@@ -700,3 +700,16 @@ list, so a user with two data sources does not get their samples doubled;
 `mealTypeId` covers all ten meal enum values instead of six; and `tryGet`
 in the profile composite no longer swallows auth or 5xx failures, which
 would have reported an empty profile as success and cached it for an hour.
+
+### Live probe of the completed read surface
+
+`get_heart_rate_intraday` at 15min returned 96 aggregated points for a
+full day — a sensible curve (nightly trough ~62, daytime peak 102) rather
+than the raw sample dump the pre-fix code would have produced.
+
+`list_devices` surfaced a third scope gap: `users.pairedDevices.list`
+requires `googlehealth.settings.readonly` and `users.getProfile` requires
+`profile.readonly`, neither of which we were requesting. That is the
+second time a scope family only revealed itself when a tool was first
+called for real — the Discovery doc lists per-method scopes, so this is
+checkable up front and is now part of what to verify when adding a method.
